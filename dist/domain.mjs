@@ -9,12 +9,42 @@ export function validInteger(value, label, min = 0, max = MAX_COUNT) {
 }
 
 export function createSession({ title = '今晚的酒局', cupSize = 2, members = [], round = 1, demo = false } = {}) {
+  const sharedCupSize = validInteger(cupSize, '每杯数量', 1, 99);
   return {
-    version: 1, title, cupSize: validInteger(cupSize, '每杯数量', 1, 99), round,
+    version: 1, title, cupSize: sharedCupSize, round,
     startedAt: Date.now(), demo,
-    members: members.map(member => ({ ...member, pending: 0, consumed: 0, cups: 0 })),
+    members: members.map(member => ({ ...member, cupSize: sharedCupSize, pending: 0, consumed: 0, cups: 0 })),
     events: [],
   };
+}
+
+// Keep the stored v1 member shape compatible while the round owns the cup size.
+export function normalizeSessionCupSize(session) {
+  return { ...session, members: session.members.map(member => ({ ...member, cupSize: session.cupSize })) };
+}
+
+export function addMembers(session, drafts) {
+  if (!Array.isArray(drafts) || drafts.length === 0) throw new Error('请至少添加一位酒友');
+  if (session.members.length + drafts.length > 30) throw new Error('一局最多添加 30 位成员');
+  const names = new Set(session.members.map(member => member.name.toLowerCase()));
+  const members = drafts.map((draft, index) => {
+    const name = typeof draft?.name === 'string' ? draft.name.trim() : '';
+    if (!name) throw new Error(`请输入第 ${index + 1} 位成员的昵称`);
+    if (name.length > 12) throw new Error(`第 ${index + 1} 位成员昵称最多 12 个字`);
+    if (names.has(name.toLowerCase())) throw new Error(`「${name}」昵称重复，请使用不同昵称`);
+    names.add(name.toLowerCase());
+    return {
+      id: crypto.randomUUID(), name, color: (session.members.length + index) % 6,
+      pending: validInteger(draft.pending ?? 0, `第 ${index + 1} 位成员待喝数量`),
+      cupSize: session.cupSize, consumed: 0, cups: 0,
+    };
+  });
+  const at = Date.now();
+  const events = members.filter(member => member.pending > 0).map(member => ({
+    id: crypto.randomUUID(), memberId: member.id, name: member.name, color: member.color,
+    action: 'set', amount: member.pending, at,
+  }));
+  return normalizeSessionCupSize({ ...session, members: [...session.members, ...members], events: [...events.reverse(), ...session.events].slice(0, 80) });
 }
 
 export function memberAction(session, id, action, quantity = 1) {
@@ -25,8 +55,8 @@ export function memberAction(session, id, action, quantity = 1) {
   let cups = member.cups;
   let amount;
   if (action === 'drink') {
-    amount = member.cupSize;
-    if (pending < amount) throw new Error(`待喝不足一杯（${amount} 个），请先加酒或调整杯量`);
+    amount = session.cupSize;
+    if (pending < amount) throw new Error(`待喝不足一杯（${amount} 个），请先加酒`);
     if (consumed + amount > MAX_COUNT) throw new Error('已喝数量已达到上限');
     pending -= amount;
     consumed += amount;
@@ -85,8 +115,8 @@ export function demoSession() {
   session.members = [
     { id: 'demo-1', name: '阿杰', color: 0, cupSize: 2, pending: 6, consumed: 8, cups: 4 },
     { id: 'demo-2', name: '小林', color: 1, cupSize: 2, pending: 4, consumed: 6, cups: 3 },
-    { id: 'demo-3', name: '大白', color: 2, cupSize: 3, pending: 3, consumed: 3, cups: 1 },
-    { id: 'demo-4', name: '思思', color: 3, cupSize: 1, pending: 2, consumed: 5, cups: 5 },
+    { id: 'demo-3', name: '大白', color: 2, cupSize: 2, pending: 3, consumed: 4, cups: 2 },
+    { id: 'demo-4', name: '思思', color: 3, cupSize: 2, pending: 2, consumed: 2, cups: 1 },
   ];
   return session;
 }

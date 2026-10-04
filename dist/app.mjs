@@ -1,4 +1,4 @@
-import { createSession, memberAction, leaderboard, validateSession, demoSession, validInteger, MAX_COUNT } from './domain.mjs';
+import { createSession, memberAction, leaderboard, validateSession, normalizeSessionCupSize, addMembers, demoSession, validInteger, MAX_COUNT } from './domain.mjs?v=20261004-crew';
 
 const paths = {
   wine: '<path d="M8 3h8l1 6a5 5 0 0 1-10 0l1-6ZM12 14v7m-4 0h8M7.5 8h9"/>',
@@ -43,6 +43,7 @@ let selectedMemberId = null;
 let snapshots = [];
 let editId = null;
 let selectedColor = 0;
+let draftMemberIndex = 0;
 let toastTimer;
 let storageAvailable = true;
 let loadedInvalid = false;
@@ -51,7 +52,7 @@ try {
   if (raw) {
     const data = JSON.parse(raw);
     if (!validateSession(data.session)) throw new Error('invalid storage');
-    session = data.session;
+    session = normalizeSessionCupSize(data.session);
     step = validInteger(data.step ?? 1, '快捷加减数量', 1, 99);
   }
 } catch {
@@ -132,10 +133,11 @@ function renderMemberControls() {
   }
   const name = escapeHTML(member.name);
   const id = escapeHTML(member.id);
-  const insufficient = member.pending < member.cupSize;
-  const limitReached = member.consumed + member.cupSize > MAX_COUNT;
-  const drinkTitle = insufficient ? `待喝不足一杯（${member.cupSize} 个）` : limitReached ? '已喝数量已达到上限' : `喝完一杯，扣减 ${member.cupSize} 个`;
-  $('#member-controls').innerHTML = `<div class="selected-member-heading"><h3 class="selected-member-name">${name}</h3><button type="button" class="selected-cup-setting" data-edit="${id}" aria-label="设置${name}的每杯数量">1 杯 = ${member.cupSize} 个</button><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>−${step}</button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>+${step}</button><button class="button member-drink" data-action="drink" data-id="${id}" title="${drinkTitle}" aria-label="${name}喝完一杯，扣减${member.cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('wine')}<span>−${member.cupSize}</span></button></div>`;
+  const cupSize = session.cupSize;
+  const insufficient = member.pending < cupSize;
+  const limitReached = member.consumed + cupSize > MAX_COUNT;
+  const drinkTitle = insufficient ? `待喝不足一杯（${cupSize} 个）` : limitReached ? '已喝数量已达到上限' : `喝完一杯，扣减 ${cupSize} 个`;
+  $('#member-controls').innerHTML = `<div class="selected-member-heading"><h3 class="selected-member-name">${name}</h3><span class="selected-cup-setting">1 杯 = ${cupSize} 个</span><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>−${step}</button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>+${step}</button><button class="button member-drink" data-action="drink" data-id="${id}" title="${drinkTitle}" aria-label="${name}喝完一杯，扣减${cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('wine')}<span>−${cupSize}</span></button></div>`;
 }
 
 function switchView(nextView) {
@@ -154,27 +156,49 @@ function renderColors() {
   $('#color-picker').innerHTML = colors.map((color, index) => `<button type="button" class="color-choice" role="radio" aria-checked="${selectedColor === index}" aria-label="${color.name}" data-color="${index}" tabindex="${selectedColor === index ? 0 : -1}" style="${colorStyle(index)}">${selectedColor === index ? icon('check') : ''}</button>`).join('');
 }
 
-function openMember(id = null) {
-  const member = id ? session.members.find(item => item.id === id) : null;
-  if (id && !member) return;
-  if (!id && session.members.length >= 30) { toast('一局最多添加 30 位成员', { error: true }); return; }
+function updateMemberDrafts() {
+  const rows = $('#draft-members').querySelectorAll('.member-draft-row');
+  $('#append-member').disabled = session.members.length + rows.length >= 30;
+  $('#add-members-submit').textContent = `添加 ${rows.length} 位`;
+  rows.forEach(row => { row.querySelector('[data-remove-draft]').disabled = rows.length === 1; });
+}
+
+function appendMemberDraft() {
+  if (session.members.length + $('#draft-members').children.length >= 30) return;
+  const index = ++draftMemberIndex;
+  const row = document.createElement('div');
+  row.className = 'member-draft-row';
+  row.innerHTML = `<label>昵称<input class="draft-name" id="draft-name-${index}" aria-label="成员${index}昵称" maxlength="12" placeholder="酒友昵称" required autocomplete="off" /></label><label>待喝（个）<input class="draft-pending" id="draft-pending-${index}" aria-label="成员${index}待喝数量" type="number" min="0" max="9999" step="1" value="0" required /></label><button type="button" class="icon-button remove-draft" data-remove-draft aria-label="移除成员${index}输入">${icon('x')}</button>`;
+  $('#draft-members').append(row);
+  updateMemberDrafts();
+  return row;
+}
+
+function openAddMembers() {
+  if (session.members.length >= 30) { toast('一局最多添加 30 位成员', { error: true }); return; }
+  $('#draft-members').innerHTML = '';
+  $('#add-members-error').textContent = '';
+  draftMemberIndex = 0;
+  appendMemberDraft();
+  $('#add-members-dialog').showModal();
+}
+
+function openMember(id) {
+  const member = session.members.find(item => item.id === id);
+  if (!member) return;
   editId = id;
-  selectedColor = member?.color ?? session.members.length % colors.length;
-  $('#member-dialog-title').textContent = member ? '编辑酒友' : '添加酒友';
-  $('#member-name').value = member?.name ?? '';
-  $('#member-pending').value = member?.pending ?? 0;
-  $('#member-cup').value = member?.cupSize ?? session.cupSize;
-  $('#delete-member').hidden = !member;
+  selectedColor = member.color;
+  $('#member-name').value = member.name;
+  $('#member-pending').value = member.pending;
   $('#member-error').textContent = '';
   renderColors();
   $('#member-dialog').showModal();
 }
 
 function openDialog(name) {
-  if (name === 'add-member') return openMember();
+  if (name === 'add-member') return openAddMembers();
   if (name === 'settings') {
     $('#settings-name').value = session.title;
-    $('#settings-cup').value = session.cupSize;
     $('#settings-step').value = step;
     $('#settings-error').textContent = '';
     $('#settings-dialog').showModal();
@@ -203,12 +227,21 @@ document.addEventListener('click', event => {
     }
   }
   if (button.dataset.edit) openMember(button.dataset.edit);
+  if (button.hasAttribute('data-add-draft')) appendMemberDraft()?.querySelector('.draft-name').focus();
+  if (button.hasAttribute('data-remove-draft')) {
+    const row = button.closest('.member-draft-row');
+    const adjacent = row.nextElementSibling ?? row.previousElementSibling;
+    row.remove();
+    updateMemberDrafts();
+    $('#add-members-error').textContent = '';
+    (adjacent?.querySelector('.draft-name') ?? $('#append-member')).focus();
+  }
   if (button.dataset.color) { selectedColor = Number(button.dataset.color); renderColors(); $('#color-picker').querySelector(`[data-color="${selectedColor}"]`).focus(); }
   if (button.dataset.action) {
     try {
       const member = session.members.find(item => item.id === button.dataset.id);
       const next = memberAction(session, button.dataset.id, button.dataset.action, step);
-      const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${member.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${step} 个`;
+      const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${session.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${step} 个`;
       commit(next, message);
       $('#member-controls').querySelector(`[data-id="${CSS.escape(button.dataset.id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
     } catch (error) { toast(error.message, { error: true }); }
@@ -225,6 +258,18 @@ $('#color-picker').addEventListener('keydown', event => {
   $('#color-picker').querySelector(`[data-color="${selectedColor}"]`).focus();
 });
 
+$('#add-members-form').addEventListener('submit', event => {
+  event.preventDefault();
+  try {
+    const drafts = [...$('#draft-members').querySelectorAll('.member-draft-row')].map(row => ({ name: row.querySelector('.draft-name').value, pending: row.querySelector('.draft-pending').value }));
+    const next = addMembers(session, drafts);
+    selectedMemberId = next.members[session.members.length].id;
+    commit(next, `已添加 ${drafts.length} 位酒友`);
+    $('#add-members-dialog').close();
+    switchView('ledger');
+  } catch (error) { $('#add-members-error').textContent = error.message; }
+});
+
 $('#member-form').addEventListener('submit', event => {
   event.preventDefault();
   try {
@@ -232,13 +277,13 @@ $('#member-form').addEventListener('submit', event => {
     if (!name) throw new Error('请输入成员昵称');
     if (session.members.some(member => member.id !== editId && member.name.toLowerCase() === name.toLowerCase())) throw new Error('已有同名成员，请使用不同昵称');
     const pending = validInteger($('#member-pending').value, '待喝数量');
-    const cupSize = validInteger($('#member-cup').value, '每杯数量', 1, 99);
     const old = session.members.find(member => member.id === editId);
-    const member = { id: editId ?? crypto.randomUUID(), name, color: selectedColor, pending, cupSize, consumed: old?.consumed ?? 0, cups: old?.cups ?? 0 };
-    const next = { ...session, members: old ? session.members.map(item => item.id === editId ? member : item) : [...session.members, member] };
+    if (!old) throw new Error('没有找到这位成员');
+    const member = { ...old, name, color: selectedColor, pending, cupSize: session.cupSize };
+    const next = { ...session, members: session.members.map(item => item.id === editId ? member : item) };
     selectedMemberId = member.id;
-    if (pending !== (old?.pending ?? 0)) next.events = [{ id: crypto.randomUUID(), memberId: member.id, name, color: selectedColor, action: 'set', amount: pending, at: Date.now() }, ...session.events].slice(0, 80);
-    commit(next, old ? `已更新${name}` : `${name}已加入本局`);
+    if (pending !== old.pending) next.events = [{ id: crypto.randomUUID(), memberId: member.id, name, color: selectedColor, action: 'set', amount: pending, at: Date.now() }, ...session.events].slice(0, 80);
+    commit(next, `已更新${name}`);
     $('#member-dialog').close();
     switchView('ledger');
   } catch (error) { $('#member-error').textContent = error.message; }
@@ -249,11 +294,10 @@ $('#settings-form').addEventListener('submit', event => {
   try {
     const title = $('#settings-name').value.trim();
     if (!title) throw new Error('请输入酒局名称');
-    const cupSize = validInteger($('#settings-cup').value, '每杯数量', 1, 99);
     const nextStep = validInteger($('#settings-step').value, '快捷加减数量', 1, 99);
     step = nextStep;
-    snapshots = snapshots.map(snapshot => ({ ...snapshot, title, cupSize }));
-    commit({ ...session, title, cupSize }, '酒局设置已保存', false);
+    snapshots = snapshots.map(snapshot => ({ ...snapshot, title }));
+    commit({ ...session, title }, '酒局设置已保存', false);
     $('#settings-dialog').close();
   } catch (error) { $('#settings-error').textContent = error.message; }
 });
@@ -302,7 +346,7 @@ window.addEventListener('storage', event => {
     const data = JSON.parse(event.newValue);
     if (!validateSession(data.session)) return;
     step = validInteger(data.step ?? 1, '快捷加减数量', 1, 99);
-    session = data.session;
+    session = normalizeSessionCupSize(data.session);
     snapshots = [];
     document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
     render();
@@ -329,12 +373,12 @@ if (document.modelContext?.registerTool) {
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     execute(input) {
       if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) throw new Error('请输入空对象');
-      return { title: session.title, round: session.round, demo: session.demo, members: structuredClone(session.members), leaderboard: leaderboard(session) };
+      return { title: session.title, round: session.round, demo: session.demo, cupSize: session.cupSize, members: structuredClone(session.members), leaderboard: leaderboard(session) };
     },
   });
   register({
     name: 'record_member_drinking_action', title: '为成员记酒',
-    description: 'Add or subtract pending drink units for one existing member, or complete one cup using that member’s configured cup size. Changes the visible ledger and current-round leaderboard; supports UI undo.',
+    description: 'Add or subtract pending drink units for one existing member, or complete one cup using the current round’s shared cup size. Changes the visible ledger and current-round leaderboard; supports UI undo.',
     inputSchema: { type: 'object', properties: { memberId: { type: 'string' }, action: { type: 'string', enum: ['add', 'subtract', 'drink'] }, quantity: { type: 'integer', minimum: 1, maximum: 99 } }, required: ['memberId', 'action'], additionalProperties: false },
     annotations: { readOnlyHint: false, untrustedContentHint: true },
     execute(input) {
