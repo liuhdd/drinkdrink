@@ -25,12 +25,12 @@ const icon = name => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24
 const $ = selector => document.querySelector(selector);
 const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const colors = [
-  { bg: '#3d4530', fg: '#c8ee83', name: '青柠' },
-  { bg: '#393244', fg: '#c7afed', name: '紫葡萄' },
-  { bg: '#453931', fg: '#e0b09b', name: '蜜桃' },
-  { bg: '#303e43', fg: '#9cc9d5', name: '冰蓝' },
-  { bg: '#45402e', fg: '#e8d185', name: '麦黄' },
-  { bg: '#42323a', fg: '#e7a8c5', name: '莓红' },
+  { bg: '#f3e1d6', fg: '#8d533b', name: '陶土' },
+  { bg: '#ebe5f0', fg: '#6f607d', name: '雾紫' },
+  { bg: '#e3e9de', fg: '#586247', name: '鼠尾草' },
+  { bg: '#e0e7ea', fg: '#4d6472', name: '灰蓝' },
+  { bg: '#eee7d6', fg: '#786b48', name: '沙金' },
+  { bg: '#efdde1', fg: '#885966', name: '烟粉' },
 ];
 const colorStyle = color => `--avatar-bg:${colors[color]?.bg || colors[0].bg};--avatar-fg:${colors[color]?.fg || colors[0].fg}`;
 const avatar = (member, extra = '') => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
