@@ -1,0 +1,92 @@
+export const MAX_COUNT = 9999;
+
+export function validInteger(value, label, min = 0, max = MAX_COUNT) {
+  const number = Number(value);
+  if (String(value).trim() === '' || !Number.isInteger(number) || number < min || number > max) {
+    throw new Error(`${label}请输入 ${min}–${max} 之间的整数`);
+  }
+  return number;
+}
+
+export function createSession({ title = '今晚的酒局', cupSize = 2, members = [], round = 1, demo = false } = {}) {
+  return {
+    version: 1, title, cupSize: validInteger(cupSize, '每杯数量', 1, 99), round,
+    startedAt: Date.now(), demo,
+    members: members.map(member => ({ ...member, pending: 0, consumed: 0, cups: 0 })),
+    events: [],
+  };
+}
+
+export function memberAction(session, id, action, quantity = 1) {
+  const member = session.members.find(item => item.id === id);
+  if (!member) throw new Error('没有找到这位成员');
+  let pending = member.pending;
+  let consumed = member.consumed;
+  let cups = member.cups;
+  let amount;
+  if (action === 'drink') {
+    amount = member.cupSize;
+    if (pending < amount) throw new Error(`待喝不足一杯（${amount} 个），请先加酒或调整杯量`);
+    if (consumed + amount > MAX_COUNT) throw new Error('已喝数量已达到上限');
+    pending -= amount;
+    consumed += amount;
+    cups += 1;
+  } else if (action === 'add' || action === 'subtract') {
+    amount = validInteger(quantity, '加减数量', 1, 99);
+    if (action === 'subtract' && pending < amount) throw new Error('待喝数量不能小于 0');
+    if (action === 'add' && pending + amount > MAX_COUNT) throw new Error('待喝数量已达到上限');
+    pending += action === 'add' ? amount : -amount;
+  } else {
+    throw new Error('未知的记账操作');
+  }
+  return {
+    ...session,
+    members: session.members.map(item => item.id === id ? { ...item, pending, consumed, cups } : item),
+    events: [{ id: crypto.randomUUID(), memberId: id, name: member.name, color: member.color, action, amount, at: Date.now() }, ...session.events].slice(0, 80),
+  };
+}
+
+export function leaderboard(session) {
+  const sorted = [...session.members].sort((a, b) => b.consumed - a.consumed || session.members.indexOf(a) - session.members.indexOf(b));
+  return sorted.map((member, index) => ({
+    ...member,
+    rank: index > 0 && member.consumed === sorted[index - 1].consumed
+      ? sorted.findIndex(item => item.consumed === member.consumed) + 1 : index + 1,
+  }));
+}
+
+export function validateSession(value) {
+  if (!value || value.version !== 1 || typeof value.title !== 'string' || !value.title.trim() || value.title.length > 30 || !Array.isArray(value.members) || value.members.length > 30) return false;
+  try {
+    validInteger(value.cupSize, '每杯数量', 1, 99);
+    validInteger(value.round, '局数', 1, Number.MAX_SAFE_INTEGER);
+    if (!Number.isFinite(value.startedAt) || typeof value.demo !== 'boolean') return false;
+    const ids = new Set();
+    for (const member of value.members) {
+      if (typeof member.id !== 'string' || ids.has(member.id) || typeof member.name !== 'string' || !member.name.trim() || member.name.length > 12) return false;
+      ids.add(member.id);
+      validInteger(member.cupSize, '杯量', 1, 99);
+      validInteger(member.pending, '待喝');
+      validInteger(member.consumed, '已喝');
+      validInteger(member.cups, '杯数');
+      if (!Number.isInteger(member.color) || member.color < 0 || member.color > 5) return false;
+    }
+    if (!Array.isArray(value.events) || value.events.length > 80) return false;
+    for (const event of value.events) {
+      if (!event || typeof event.id !== 'string' || typeof event.name !== 'string' || !['add', 'subtract', 'drink', 'set'].includes(event.action) || !Number.isFinite(event.at)) return false;
+      validInteger(event.amount, '数量', event.action === 'set' ? 0 : 1, event.action === 'set' ? MAX_COUNT : 99);
+    }
+    return true;
+  } catch { return false; }
+}
+
+export function demoSession() {
+  const session = createSession({ title: '周末小聚', demo: true });
+  session.members = [
+    { id: 'demo-1', name: '阿杰', color: 0, cupSize: 2, pending: 6, consumed: 8, cups: 4 },
+    { id: 'demo-2', name: '小林', color: 1, cupSize: 2, pending: 4, consumed: 6, cups: 3 },
+    { id: 'demo-3', name: '大白', color: 2, cupSize: 3, pending: 3, consumed: 3, cups: 1 },
+    { id: 'demo-4', name: '思思', color: 3, cupSize: 1, pending: 2, consumed: 5, cups: 5 },
+  ];
+  return session;
+}

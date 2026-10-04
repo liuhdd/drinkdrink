@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#121315" />
+    <meta name="description" content="微醺账本，轻松管理酒局成员、加减酒、按杯扣减与单局排行榜。" />
+    <title>微醺账本 · 酒局记账</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23c9f27b'/%3E%3Cpath d='M9 8h14l-2 9H11zM16 17v7m-5 0h10' fill='none' stroke='%23121315' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./app.mjs"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a href="#" class="brand" aria-label="微醺账本首页"><span class="brand-mark" data-icon="wine"></span><span>微醺账本<span class="brand-en">CHEERS, KEEP TRACK.</span></span></a>
+      <nav class="desktop-nav" aria-label="主导航"><button data-view="ledger" class="nav-tab active"><span data-icon="grid"></span>酒局记账</button><button data-view="ranking" class="nav-tab"><span data-icon="trophy"></span>单局排行</button></nav>
+      <button class="settings-button" data-open="settings" aria-label="酒局设置"><span data-icon="settings"></span><span>酒局设置</span></button>
+    </header>
+    <main class="page">
+      <section class="page-heading">
+        <div><div class="eyebrow"><span class="live-dot"></span> TONIGHT'S SESSION <span id="demo-badge" class="demo-badge">体验酒局</span></div><h1>今晚，喝个明白<span class="lime">。</span></h1><div class="session-meta"><span id="session-title">周末小聚</span><span class="meta-divider"></span><span id="session-round">第 01 局</span><span class="meta-divider"></span><span id="session-date"></span></div></div>
+        <button class="button secondary new-session" data-open="new-session"><span data-icon="refresh"></span>新开一局</button>
+      </section>
+      <div class="demo-notice" id="demo-notice"><span data-icon="sparkles"></span><span>先用示例体验记账，准备好后「新开一局」开始记录。</span><button data-open="new-session">开始我的酒局<span data-icon="chevron"></span></button></div>
+      <section class="stats-strip" aria-label="本局概览">
+        <div class="stat"><span class="stat-icon lavender" data-icon="users"></span><div><span class="stat-label">本局成员</span><strong id="stat-members">4<span>人</span></strong></div></div>
+        <div class="stat"><span class="stat-icon yellow" data-icon="wine"></span><div><span class="stat-label">还待喝</span><strong id="stat-pending">15<span>个</span></strong></div></div>
+        <div class="stat"><span class="stat-icon green" data-icon="check-circle"></span><div><span class="stat-label">累计已喝</span><strong id="stat-consumed">22<span>个</span></strong></div></div>
+        <div class="stat"><span class="stat-icon peach" data-icon="cheers"></span><div><span class="stat-label">已喝杯数</span><strong id="stat-cups">13<span>杯</span></strong></div></div>
+      </section>
+      <div class="workspace" id="workspace">
+        <section class="ledger-panel" id="ledger-panel" aria-label="成员记账">
+          <div class="section-heading"><div><h2>本局酒友 <span id="member-count" class="count-badge">04</span></h2><p>加减随手记，喝完一杯轻松扣。</p></div><button class="button primary" data-open="add-member"><span data-icon="plus"></span>添加成员</button></div>
+          <div class="members-grid" id="members-grid"></div>
+          <section class="activity-panel"><div class="activity-heading"><h3><span data-icon="history"></span>最近记录</h3><button class="text-button" id="undo-button" disabled><span data-icon="undo"></span>撤销上一步</button></div><div id="activity-list"></div></section>
+        </section>
+        <aside class="ranking-panel" id="ranking-panel" aria-label="单局排行榜">
+          <div class="ranking-heading"><div><span class="eyebrow">THE NIGHT'S LINEUP</span><h2>单局排行榜<span data-icon="trophy"></span></h2></div><span class="round-chip" id="ranking-round">第 01 局</span></div>
+          <div class="ranking-criterion"><span>按已喝数量排序</span><span>实时更新</span></div>
+          <div id="leaderboard"></div>
+          <div class="ranking-note"><span data-icon="info"></span><span>杯量可以不同，按「个」公平记账。<br />相同已喝数量并列排名。</span></div>
+          <div class="cheers-note"><span data-icon="cheers"></span><p>开心碰杯，量力而行。</p><span>好朋友的局，尽兴就好</span></div>
+        </aside>
+      </div>
+      <footer class="page-footer"><span class="footer-brand">微醺账本 <span>·</span> 让每一杯都有数</span><span id="save-status"><span data-icon="cloud-check"></span>本机自动保存</span></footer>
+    </main>
+    <nav class="mobile-nav" aria-label="移动导航"><button data-view="ledger" class="active"><span data-icon="grid"></span>记账</button><button data-view="ranking"><span data-icon="trophy"></span>排行</button><button data-open="settings"><span data-icon="settings"></span>设置</button></nav>
+    <dialog id="member-dialog" aria-labelledby="member-dialog-title"><form id="member-form"><div class="dialog-heading"><div><span class="eyebrow">YOUR DRINKING CREW</span><h2 id="member-dialog-title">添加酒友</h2></div><button type="button" class="icon-button" data-close aria-label="关闭"><span data-icon="x"></span></button></div><label>成员昵称<input id="member-name" name="name" maxlength="12" placeholder="怎么称呼这位酒友？" required autocomplete="off" /></label><label>选择头像颜色</label><div id="color-picker" class="color-picker" role="radiogroup" aria-label="头像颜色"></div><div class="form-two-col"><label>待喝数量（个）<input id="member-pending" type="number" min="0" max="9999" step="1" required /></label><label>一杯算几个<input id="member-cup" type="number" min="1" max="99" step="1" required /></label></div><p class="form-hint">喝完一杯时，从待喝中扣除这个数量，并计入已喝。</p><p id="member-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" id="delete-member" class="button danger" hidden>移除成员</button><button type="button" class="button secondary" data-close>取消</button><button type="submit" class="button primary">保存成员</button></div></form></dialog>
+    <dialog id="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-heading"><div><span class="eyebrow">MAKE IT YOUR ROUND</span><h2 id="settings-title">酒局设置</h2></div><button type="button" class="icon-button" data-close aria-label="关闭"><span data-icon="x"></span></button></div><label>本局名称<input id="settings-name" maxlength="30" required /></label><label>新成员默认一杯算几个<input id="settings-cup" type="number" min="1" max="99" step="1" required /></label><p class="form-hint">已加入成员保留自己的杯量，可在成员卡片中单独调整。</p><label>快捷加减数量（个）<input id="settings-step" type="number" min="1" max="99" step="1" required /></label><p class="form-hint">成员卡片上的「＋」「−」每次操作这个数量。</p><p id="settings-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" class="button secondary" data-close>取消</button><button type="submit" class="button primary">保存设置</button></div></form></dialog>
+    <dialog id="session-dialog" aria-labelledby="session-title-heading"><form id="session-form"><div class="dialog-heading"><div><span class="eyebrow">A FRESH START</span><h2 id="session-title-heading">开启新一局</h2></div><button type="button" class="icon-button" data-close aria-label="关闭"><span data-icon="x"></span></button></div><label>酒局名称<input id="new-session-name" maxlength="30" required placeholder="给今晚的小聚起个名字" /></label><label>默认一杯算几个<input id="new-session-cup" type="number" min="1" max="99" step="1" required /></label><label class="checkbox-label"><input id="keep-members" type="checkbox" checked /><span>保留本局成员与各自杯量</span></label><div class="reset-notice"><span data-icon="info"></span><p>开启后将清空本局待喝、已喝和操作记录，排行榜重新计数。此操作无法撤销。</p></div><p id="session-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" class="button secondary" data-close>再等等</button><button type="submit" class="button primary">确认开启</button></div></form></dialog>
+    <dialog id="remove-dialog" aria-labelledby="remove-title"><form id="remove-form"><div class="dialog-heading"><h2 id="remove-title">移除成员</h2><button type="button" class="icon-button" data-close aria-label="关闭"><span data-icon="x"></span></button></div><p id="remove-message"></p><div class="dialog-actions"><button type="button" class="button secondary" data-close>取消</button><button type="submit" class="button danger">确认移除</button></div></form></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
