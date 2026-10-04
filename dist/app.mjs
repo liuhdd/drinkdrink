@@ -103,7 +103,6 @@ function render() {
   $('#ranking-round').textContent = `第 ${String(session.round).padStart(2, '0')} 局`;
   $('#session-date').textContent = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' }).format(session.startedAt);
   $('#demo-badge').hidden = !session.demo;
-  $('#demo-notice').hidden = !session.demo;
   $('#member-count').textContent = String(session.members.length).padStart(2, '0');
   if (!session.members.some(member => member.id === selectedMemberId)) selectedMemberId = null;
   $('#members-grid').innerHTML = session.members.length ? session.members.map(member => {
