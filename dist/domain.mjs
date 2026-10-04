@@ -23,18 +23,26 @@ export function normalizeSessionCupSize(session) {
   return { ...session, members: session.members.map(member => ({ ...member, cupSize: session.cupSize })) };
 }
 
-export function addMembers(session, drafts) {
+export function addMembers(session, drafts, knownMembers = []) {
   if (!Array.isArray(drafts) || drafts.length === 0) throw new Error('请至少添加一位酒友');
   if (session.members.length + drafts.length > 30) throw new Error('一局最多添加 30 位成员');
   const names = new Set(session.members.map(member => member.name.toLowerCase()));
+  const ids = new Set(session.members.map(member => member.id));
   const members = drafts.map((draft, index) => {
-    const name = typeof draft?.name === 'string' ? draft.name.trim() : '';
+    const typedName = typeof draft?.name === 'string' ? draft.name.trim() : '';
+    const known = draft?.knownMemberId
+      ? knownMembers.find(member => member.id === draft.knownMemberId)
+      : knownMembers.find(member => member.name.toLowerCase() === typedName.toLowerCase());
+    if (draft?.knownMemberId && !known) throw new Error('没有找到这位已保存成员，请重新选择');
+    const name = known?.name ?? typedName;
     if (!name) throw new Error(`请输入第 ${index + 1} 位成员的昵称`);
     if (name.length > 12) throw new Error(`第 ${index + 1} 位成员昵称最多 12 个字`);
-    if (names.has(name.toLowerCase())) throw new Error(`「${name}」昵称重复，请使用不同昵称`);
+    if (names.has(name.toLowerCase()) || (known && ids.has(known.id))) throw new Error(`「${name}」成员重复，请选择其他酒友`);
     names.add(name.toLowerCase());
+    const id = known?.id ?? crypto.randomUUID();
+    ids.add(id);
     return {
-      id: crypto.randomUUID(), name, color: (session.members.length + index) % 6,
+      id, name, color: known?.color ?? (session.members.length + index) % 6,
       pending: validInteger(draft.pending ?? 0, `第 ${index + 1} 位成员待喝数量`),
       cupSize: session.cupSize, consumed: 0, cups: 0,
     };
@@ -88,13 +96,15 @@ export function leaderboard(session) {
 export function validateSession(value) {
   if (!value || value.version !== 1 || typeof value.title !== 'string' || !value.title.trim() || value.title.length > 30 || !Array.isArray(value.members) || value.members.length > 30) return false;
   try {
+    if (!Number.isInteger(value.cupSize) || !Number.isInteger(value.round)) return false;
     validInteger(value.cupSize, '每杯数量', 1, 99);
     validInteger(value.round, '局数', 1, Number.MAX_SAFE_INTEGER);
-    if (!Number.isFinite(value.startedAt) || typeof value.demo !== 'boolean') return false;
+    if (!Number.isFinite(value.startedAt) || !Number.isFinite(new Date(value.startedAt).getTime()) || typeof value.demo !== 'boolean') return false;
     const ids = new Set();
     for (const member of value.members) {
-      if (typeof member.id !== 'string' || ids.has(member.id) || typeof member.name !== 'string' || !member.name.trim() || member.name.length > 12) return false;
+      if (!member || typeof member.id !== 'string' || !member.id || ids.has(member.id) || typeof member.name !== 'string' || !member.name.trim() || member.name.length > 12) return false;
       ids.add(member.id);
+      if (![member.cupSize, member.pending, member.consumed, member.cups].every(Number.isInteger)) return false;
       validInteger(member.cupSize, '杯量', 1, 99);
       validInteger(member.pending, '待喝');
       validInteger(member.consumed, '已喝');
@@ -103,7 +113,7 @@ export function validateSession(value) {
     }
     if (!Array.isArray(value.events) || value.events.length > 80) return false;
     for (const event of value.events) {
-      if (!event || typeof event.id !== 'string' || typeof event.name !== 'string' || !['add', 'subtract', 'drink', 'set'].includes(event.action) || !Number.isFinite(event.at)) return false;
+      if (!event || typeof event.id !== 'string' || !event.id || typeof event.memberId !== 'string' || typeof event.name !== 'string' || !event.name.trim() || event.name.length > 12 || !Number.isInteger(event.color) || event.color < 0 || event.color > 5 || !['add', 'subtract', 'drink', 'set'].includes(event.action) || !Number.isFinite(event.at) || !Number.isFinite(new Date(event.at).getTime()) || !Number.isInteger(event.amount)) return false;
       validInteger(event.amount, '数量', event.action === 'set' ? 0 : 1, event.action === 'set' ? MAX_COUNT : 99);
     }
     return true;

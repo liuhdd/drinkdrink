@@ -2,3 +2,7 @@
 node_modules/
 *.tar.gz
 .DS_Store
+dist/client/
+dist/server/
+dist/.openai/
+.local-data/

@@ -181,6 +181,35 @@ input:not([type="checkbox"]):focus { border-color: #b07b64; }
 .remove-draft:disabled { color: #c7c0b5; background: transparent; }
 .append-member { width: 100%; margin-top: 20px; color: var(--muted); }
 .append-member:disabled { color: #aaa69e; background: var(--surface-up); }
+.known-members { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.known-members h3 { margin: 0; font-size: 16px; font-weight: 500; }
+.known-members-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; max-height: 220px; overflow-y: auto; }
+.known-member { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; max-width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 14px; }
+.known-member .avatar { width: 26px; height: 26px; font-size: 12px; }
+.known-member > span:not(.avatar) { overflow-wrap: anywhere; }
+.known-member > svg { width: 16px; height: 16px; color: var(--muted); }
+.known-member.chosen { border-color: #be8c75; background: var(--accent-soft); }
+.known-member.chosen > svg { color: var(--accent); }
+.known-member:disabled { opacity: .45; }
+.draft-name:read-only { color: var(--accent); background: var(--accent-soft); }
+.history-panel { max-width: 760px; margin: 0 auto; }
+.history-list { display: flex; flex-direction: column; gap: 12px; }
+.history-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 18px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); text-align: left; }
+.history-row:hover { border-color: #be8c75; background: #fdfbf6; }
+.history-info { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.history-info strong { font-size: 17px; font-weight: 500; overflow-wrap: anywhere; }
+.history-info > span { color: var(--muted); font-size: 13px; }
+.history-open { display: flex; align-items: center; gap: 4px; flex-shrink: 0; color: var(--accent); font-size: 14px; }
+.history-open svg { width: 16px; height: 16px; }
+.history-detail-dialog { width: min(620px, calc(100vw - 32px)); }
+.history-detail-dialog h2 { overflow-wrap: anywhere; }
+.history-detail-dialog h3 { margin: 24px 0 10px; font-size: 16px; font-weight: 500; }
+.history-member { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.history-member > div { flex: 1; min-width: 0; }
+.history-member strong { display: block; font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
+.history-member span:not(.avatar) { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.history-member > strong { color: var(--accent); flex-shrink: 0; }
+.history-member small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
 .form-hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
 .form-error { margin: 12px 0 0; color: #a34235; font-size: 13px; }
 .form-error:empty { display: none; }
@@ -254,7 +283,7 @@ input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var
   .ranking-only .cheers-note { margin: 0 -16px; }
   .page-footer { margin-top: 25px; padding: 16px 0; font-size: 10px; }
   .new-session { font-size: 13px; }
-  .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, 1fr); padding: 7px 16px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: #f7f6f2f2; backdrop-filter: blur(14px); }
+  .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); padding: 7px 16px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: #f7f6f2f2; backdrop-filter: blur(14px); }
   .mobile-nav button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 3px; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: #8b8579; font-size: 11px; }
   .mobile-nav button.active { color: var(--accent); }
   .mobile-nav svg { width: 20px; height: 20px; }
