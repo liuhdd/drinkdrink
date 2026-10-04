@@ -39,6 +39,7 @@ const STORAGE_KEY = 'cheers-ledger-v1';
 let session = demoSession();
 let step = 1;
 let view = 'ledger';
+let selectedMemberId = null;
 let snapshots = [];
 let editId = null;
 let selectedColor = 0;
@@ -97,7 +98,6 @@ function undo() {
 }
 
 function render() {
-  const sums = session.members.reduce((totals, member) => ({ pending: totals.pending + member.pending, consumed: totals.consumed + member.consumed, cups: totals.cups + member.cups }), { pending: 0, consumed: 0, cups: 0 });
   $('#session-title').textContent = session.title;
   $('#session-round').textContent = `第 ${String(session.round).padStart(2, '0')} 局`;
   $('#ranking-round').textContent = `第 ${String(session.round).padStart(2, '0')} 局`;
@@ -105,15 +105,15 @@ function render() {
   $('#demo-badge').hidden = !session.demo;
   $('#demo-notice').hidden = !session.demo;
   $('#member-count').textContent = String(session.members.length).padStart(2, '0');
-  for (const [key, value, unit] of [['members', session.members.length, '人'], ['pending', sums.pending, '个'], ['consumed', sums.consumed, '个'], ['cups', sums.cups, '杯']]) {
-    $(`#stat-${key}`).innerHTML = `${number(value)}<span>${unit}</span>`;
-  }
+  if (!session.members.some(member => member.id === selectedMemberId)) selectedMemberId = null;
+  $('#member-list-heading').hidden = !session.members.length;
   $('#members-grid').innerHTML = session.members.length ? session.members.map(member => {
     const name = escapeHTML(member.name);
     const id = escapeHTML(member.id);
-    const progress = member.consumed / (member.consumed + member.pending || 1) * 100;
-    return `<article class="member-card" style="${colorStyle(member.color)}"><div class="member-top">${avatar(member)}<div><h3 class="member-name">${name}</h3><div class="member-status">已喝<strong>${number(member.consumed)}</strong>个</div></div><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="pending-counter"><button class="counter-control" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>${icon('minus')}</button><div class="counter-total"><strong>${number(member.pending)}</strong><span>待喝 / 个</span></div><button class="counter-control plus" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>${icon('plus')}</button></div><div class="member-progress" aria-hidden="true"><span style="width:${progress}%"></span></div><div class="cup-setting"><button data-edit="${id}" aria-label="设置${name}的每杯数量">${icon('wine')}1 杯 = ${member.cupSize} 个 ${icon('edit')}</button><span>已喝 ${number(member.cups)} 杯</span></div><button class="drink-button" data-action="drink" data-id="${id}" ${member.pending < member.cupSize || member.consumed + member.cupSize > MAX_COUNT ? 'disabled' : ''} title="喝完一杯扣减 ${member.cupSize} 个" aria-label="${name}喝完一杯，扣减${member.cupSize}个">${icon('check')}喝完一杯<small>−${member.cupSize} 个</small></button></article>`;
+    const selected = member.id === selectedMemberId;
+    return `<button type="button" class="member-row${selected ? ' selected' : ''}" data-select-member="${id}" aria-pressed="${selected}" aria-label="选择${name}，待喝${member.pending}个" style="${colorStyle(member.color)}"><span class="member-row-identity">${avatar(member)}<span class="member-row-name">${name}</span>${selected ? `<span class="member-selected-mark">${icon('check')}</span>` : ''}</span><span class="member-row-count"><strong>${number(member.pending)}</strong><span>个</span></span></button>`;
   }).join('') : `<div class="empty-members"><span data-icon="users"></span><h3>酒友到齐，就开局</h3><p>添加第一位成员，开始记录今晚的每一杯。</p><button class="button primary" data-open="add-member">${icon('plus')}添加成员</button></div>`;
+  renderMemberControls();
   const ranked = leaderboard(session);
   const max = ranked[0]?.consumed || 1;
   $('#leaderboard').innerHTML = ranked.length ? ranked.map(member => `<div class="leader-row ${member.rank === 1 && member.consumed > 0 ? 'first' : ''}"><span class="rank-number">${member.rank === 1 && member.consumed > 0 ? icon('trophy') : String(member.rank).padStart(2, '0')}</span>${avatar(member)}<div class="leader-info"><div class="leader-name">${escapeHTML(member.name)}${member.rank === 1 && member.consumed > 0 ? '<span class="top-tag">本局领先</span>' : ''}</div><div class="leader-detail">${number(member.cups)} 杯 · 还待喝 ${number(member.pending)} 个</div><div class="leader-bar" aria-hidden="true"><span style="width:${member.consumed / max * 100}%"></span></div></div><div class="leader-score">${number(member.consumed)}<span>个</span></div></div>`).join('') : `<div class="ranking-empty">${icon('trophy')}<p>添加酒友后，排行从这里开始。</p></div>`;
@@ -123,6 +123,20 @@ function render() {
   }).join('') : `<div class="activity-empty">${icon('history')}每次加减、喝完都会记在这里</div>`;
   $('#undo-button').disabled = !snapshots.length;
   hydrateIcons($('#members-grid'));
+}
+
+function renderMemberControls() {
+  const member = session.members.find(item => item.id === selectedMemberId);
+  $('#member-controls').hidden = !session.members.length;
+  if (!member) {
+    $('#member-controls').innerHTML = `<div class="member-selection-hint">${icon('wine')}<span>选择一位酒友，即可加减酒或扣减一杯。</span></div>`;
+    return;
+  }
+  const name = escapeHTML(member.name);
+  const id = escapeHTML(member.id);
+  const insufficient = member.pending < member.cupSize;
+  const limitReached = member.consumed + member.cupSize > MAX_COUNT;
+  $('#member-controls').innerHTML = `<div class="selected-member-heading"><div class="selected-member-identity">${avatar(member)}<div><h3>正在为 <strong>${name}</strong> 记酒</h3><p>已喝 ${number(member.consumed)} 个 · ${number(member.cups)} 杯</p></div></div><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="selected-member-details"><button type="button" class="selected-cup-setting" data-edit="${id}" aria-label="设置${name}的每杯数量">${icon('wine')}1 杯 = ${member.cupSize} 个 ${icon('edit')}</button><span>待喝 <strong>${number(member.pending)}</strong> 个</span></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>${icon('minus')}减酒 <span>−${step}</span></button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>${icon('plus')}加酒 <span>+${step}</span></button><button class="button member-drink" data-action="drink" data-id="${id}" aria-label="${name}喝完一杯，扣减${member.cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('check')}喝完一杯 <span>−${member.cupSize}</span></button></div>${insufficient ? `<p class="selected-member-hint">待喝不足一杯（${member.cupSize} 个），请先加酒或调整杯量。</p>` : limitReached ? '<p class="selected-member-hint">已喝数量已达到上限。</p>' : ''}`;
 }
 
 function switchView(nextView) {
@@ -181,6 +195,14 @@ document.addEventListener('click', event => {
   if (button.dataset.open) openDialog(button.dataset.open);
   if (button.hasAttribute('data-close')) button.closest('dialog').close();
   if (button.hasAttribute('data-undo')) undo();
+  if (button.dataset.selectMember) {
+    selectedMemberId = button.dataset.selectMember;
+    render();
+    $('#members-grid').querySelector(`[data-select-member="${CSS.escape(selectedMemberId)}"]`)?.focus({ preventScroll: true });
+    if (window.matchMedia('(max-width: 720px)').matches) {
+      $('#member-controls').scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    }
+  }
   if (button.dataset.edit) openMember(button.dataset.edit);
   if (button.dataset.color) { selectedColor = Number(button.dataset.color); renderColors(); $('#color-picker').querySelector(`[data-color="${selectedColor}"]`).focus(); }
   if (button.dataset.action) {
@@ -189,7 +211,7 @@ document.addEventListener('click', event => {
       const next = memberAction(session, button.dataset.id, button.dataset.action, step);
       const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${member.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${step} 个`;
       commit(next, message);
-      $('#members-grid').querySelector(`[data-id="${CSS.escape(button.dataset.id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
+      $('#member-controls').querySelector(`[data-id="${CSS.escape(button.dataset.id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
     } catch (error) { toast(error.message, { error: true }); }
   }
 });
@@ -215,6 +237,7 @@ $('#member-form').addEventListener('submit', event => {
     const old = session.members.find(member => member.id === editId);
     const member = { id: editId ?? crypto.randomUUID(), name, color: selectedColor, pending, cupSize, consumed: old?.consumed ?? 0, cups: old?.cups ?? 0 };
     const next = { ...session, members: old ? session.members.map(item => item.id === editId ? member : item) : [...session.members, member] };
+    selectedMemberId = member.id;
     if (pending !== (old?.pending ?? 0)) next.events = [{ id: crypto.randomUUID(), memberId: member.id, name, color: selectedColor, action: 'set', amount: pending, at: Date.now() }, ...session.events].slice(0, 80);
     commit(next, old ? `已更新${name}` : `${name}已加入本局`);
     $('#member-dialog').close();
@@ -244,6 +267,7 @@ $('#session-form').addEventListener('submit', event => {
     const cupSize = validInteger($('#new-session-cup').value, '每杯数量', 1, 99);
     const next = createSession({ title, cupSize, round: session.demo ? 1 : session.round + 1, members: $('#keep-members').checked ? session.members : [] });
     snapshots = [];
+    selectedMemberId = null;
     commit(next, '新一局开始了，祝大家玩得开心', false);
     $('#session-dialog').close();
     switchView('ledger');
@@ -318,6 +342,7 @@ if (document.modelContext?.registerTool) {
       if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['memberId', 'action', 'quantity'].includes(key)) || typeof input.memberId !== 'string' || !['add', 'subtract', 'drink'].includes(input.action)) throw new Error('记账参数无效');
       if (input.quantity !== undefined) validInteger(input.quantity, '加减数量', 1, 99);
       const next = memberAction(session, input.memberId, input.action, input.quantity ?? step);
+      selectedMemberId = input.memberId;
       commit(next, '已完成记账');
       return structuredClone(session.members.find(member => member.id === input.memberId));
     },

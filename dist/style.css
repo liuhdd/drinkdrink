@@ -16,3 +16,33 @@ dialog{background:#1e1f23;color:var(--text);border:1px solid #414347;border-radi
 .ranking-heading .eyebrow{letter-spacing:1px}.stat-label,.nav-tab,.section-heading .button,.drink-button{font-size:14px}.ranking-note{line-height:1.8}.counter-control{min-width:40px;min-height:40px}.drink-button{min-height:44px}.settings-button{min-width:44px;min-height:44px}.ranking-empty{line-height:1.8}.member-top>div{min-width:0}.activity-time{font-size:12px}.demo-notice{line-height:1.7}.mobile-nav button{font-size:12px;min-height:44px}.mobile-nav{padding-top:7px;padding-bottom:calc(7px + env(safe-area-inset-bottom))}
 @media(max-width:720px){.eyebrow{font-size:12px;letter-spacing:1px}.demo-badge{font-size:12px}.new-session{font-size:12px}.section-heading p{font-size:12px}.member-status,.member-status strong,.cup-setting,.cup-setting button,.counter-total span{font-size:12px}.stat-label,.drink-button,.section-heading .button{font-size:14px}.drink-button svg{width:17px;height:17px}.member-top .icon-button{width:32px;height:32px}.member-top .icon-button svg{width:17px;height:17px}.page-footer{font-size:12px;flex-wrap:wrap}.activity-message{font-size:13px}.cup-setting{flex-wrap:wrap}.brand-en{font-size:9px;letter-spacing:1.1px}.toast{bottom:calc(88px + env(safe-area-inset-bottom))}}
 @media(max-width:520px){.members-grid{grid-template-columns:1fr}.member-card{padding:20px}.member-top .avatar{width:40px;height:40px;font-size:15px}.member-name{font-size:16px}.member-top .icon-button{width:40px;height:40px}.pending-counter{margin:20px 0 17px}.counter-control{width:44px;height:44px}.counter-control svg{width:19px;height:19px}.counter-total strong{font-size:42px}.cup-setting{margin:16px 0;font-size:13px}.cup-setting button{font-size:13px;gap:5px}.cup-setting button svg{display:block;width:14px;height:14px}.drink-button small{display:inline;font-size:12px}.page-heading{display:block;position:relative;padding-bottom:44px}.new-session{position:absolute;left:0;bottom:0;margin:0;min-height:35px}.page-heading h1{font-size:28px}.session-meta{font-size:12px}.stats-strip .stat{gap:10px}.stat strong{font-size:25px}.stat-icon{width:34px;height:34px}.form-two-col{gap:12px}}
+
+.member-list-heading{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:14px;padding:0 18px 10px}
+.members-list{display:flex;flex-direction:column;gap:9px}
+.member-row{width:100%;min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;border:1px solid var(--border);border-radius:10px;background:var(--surface);text-align:left}
+.member-row:hover{background:#24262a;border-color:#52574b}
+.member-row.selected{background:#242c1e;border-color:#90b858;box-shadow:inset 3px 0 var(--lime)}
+.member-row-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.member-row .avatar{width:36px;height:36px;font-size:14px}
+.member-row-name{font-size:16px;font-weight:500;overflow-wrap:anywhere}
+.member-selected-mark{display:flex;color:var(--lime);flex-shrink:0}.member-selected-mark svg{width:16px;height:16px}
+.member-row-count{display:flex;align-items:baseline;gap:7px;flex-shrink:0;color:#b5b7bf;font-size:14px}
+.member-row-count strong{font-family:'Manrope',sans-serif;font-size:25px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.member-row.selected .member-row-count strong{color:var(--lime)}
+.member-controls{margin-top:18px;border:1px solid #424b37;background:#1e231b;border-radius:12px;padding:19px;scroll-margin-bottom:calc(90px + env(safe-area-inset-bottom))}
+.member-selection-hint{display:flex;justify-content:center;align-items:center;gap:9px;min-height:42px;color:#a8b09f;font-size:14px;line-height:1.7}.member-selection-hint svg{width:18px;height:18px;color:var(--lime)}
+.selected-member-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.selected-member-identity{display:flex;align-items:center;gap:10px;min-width:0}.selected-member-identity>div{min-width:0}
+.selected-member-identity .avatar{width:36px;height:36px;font-size:14px}
+.selected-member-identity h3{margin:0;font-size:14px;font-weight:400;color:#bbc3b2;overflow-wrap:anywhere}.selected-member-identity h3 strong{font-weight:600;color:var(--text)}
+.selected-member-identity p{margin:3px 0 0;font-size:12px;color:#9da594}
+.selected-member-heading .icon-button{width:40px;height:40px}
+.selected-member-details{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:17px 0;color:#aab39f;font-size:14px}
+.selected-cup-setting{display:flex;align-items:center;gap:6px;padding:5px 0;border:0;background:transparent;color:#c6cfbc;font-size:14px}.selected-cup-setting svg{width:15px;height:15px}.selected-member-details strong{color:var(--lime);font-weight:600;font-variant-numeric:tabular-nums}
+.member-operation-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.member-operation-buttons .button{min-height:46px;gap:7px;padding:10px 12px;font-size:14px}.member-operation-buttons .button span{font-variant-numeric:tabular-nums}
+.member-subtract{border-color:#444a3e;background:#2a2f25;color:#d2d7cb}.member-add{background:var(--lime);color:#26331e}.member-drink{border-color:#657d4d;background:#34432a;color:var(--lime)}
+.member-operation-buttons .button:hover:not(:disabled){filter:brightness(1.12)}.member-operation-buttons .button:disabled{color:#73786c;border-color:#373d32;background:#272c23}
+.selected-member-hint{font-size:12px;color:#a2a992;margin:12px 0 0;line-height:1.7}
+@media(max-width:1100px){.member-operation-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.member-drink{grid-column:1/-1}}
+@media(max-width:720px){.member-row{min-height:62px;padding:12px 15px}.member-list-heading{padding:0 15px 9px}.member-controls{padding:16px;margin-top:16px}.members-list{gap:8px}.member-row-identity{gap:10px}.member-row-count strong{font-size:24px}.member-selection-hint{justify-content:flex-start}.member-operation-buttons{gap:9px}}
+@media(max-width:380px){.member-row{padding:11px 13px}.member-controls{padding:14px}.member-row .avatar{width:32px;height:32px}.member-row-identity{gap:8px}.member-row-name{font-size:15px}.member-selected-mark svg{width:14px;height:14px}}

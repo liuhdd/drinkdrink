@@ -22,16 +22,12 @@
         <button class="button secondary new-session" data-open="new-session"><span data-icon="refresh"></span>新开一局</button>
       </section>
       <div class="demo-notice" id="demo-notice"><span data-icon="sparkles"></span><span>先用示例体验记账，准备好后「新开一局」开始记录。</span><button data-open="new-session">开始我的酒局<span data-icon="chevron"></span></button></div>
-      <section class="stats-strip" aria-label="本局概览">
-        <div class="stat"><span class="stat-icon lavender" data-icon="users"></span><div><span class="stat-label">本局成员</span><strong id="stat-members">4<span>人</span></strong></div></div>
-        <div class="stat"><span class="stat-icon yellow" data-icon="wine"></span><div><span class="stat-label">还待喝</span><strong id="stat-pending">15<span>个</span></strong></div></div>
-        <div class="stat"><span class="stat-icon green" data-icon="check-circle"></span><div><span class="stat-label">累计已喝</span><strong id="stat-consumed">22<span>个</span></strong></div></div>
-        <div class="stat"><span class="stat-icon peach" data-icon="cheers"></span><div><span class="stat-label">已喝杯数</span><strong id="stat-cups">13<span>杯</span></strong></div></div>
-      </section>
       <div class="workspace" id="workspace">
         <section class="ledger-panel" id="ledger-panel" aria-label="成员记账">
-          <div class="section-heading"><div><h2>本局酒友 <span id="member-count" class="count-badge">04</span></h2><p>加减随手记，喝完一杯轻松扣。</p></div><button class="button primary" data-open="add-member"><span data-icon="plus"></span>添加成员</button></div>
-          <div class="members-grid" id="members-grid"></div>
+          <div class="section-heading"><div><h2>本局酒友 <span id="member-count" class="count-badge">04</span></h2><p>点选酒友，再为 TA 单独记酒。</p></div><button class="button primary" data-open="add-member"><span data-icon="plus"></span>添加成员</button></div>
+          <div class="member-list-heading" id="member-list-heading"><span>酒友</span><span>待喝酒数</span></div>
+          <div class="members-list" id="members-grid" role="group" aria-label="选择酒友"></div>
+          <section class="member-controls" id="member-controls" aria-label="所选酒友的记酒操作"></section>
           <section class="activity-panel"><div class="activity-heading"><h3><span data-icon="history"></span>最近记录</h3><button class="text-button" id="undo-button" disabled><span data-icon="undo"></span>撤销上一步</button></div><div id="activity-list"></div></section>
         </section>
         <aside class="ranking-panel" id="ranking-panel" aria-label="单局排行榜">
