@@ -155,8 +155,8 @@ h1 { margin: 14px 0 12px; font-family: var(--serif); font-size: 38px; font-weigh
 .footer-brand > span { padding: 0 5px; color: #b4ada0; }
 #save-status { display: inline-flex; align-items: center; gap: 6px; }
 #save-status svg { height: 14px; width: 14px; }
-.session-bottom { display: flex; justify-content: center; padding: 10px 0 18px; }
-.new-session { min-width: 140px; color: var(--muted); }
+.settings-session { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.new-session { width: 100%; color: var(--muted); }
 .mobile-nav { display: none; }
 .empty-members { padding: 48px 20px; border: 1px dashed #ccc5b6; border-radius: 12px; background: var(--surface); text-align: center; }
 .empty-members > [data-icon] { color: #a69a85; }
@@ -253,8 +253,7 @@ input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var
   .ranking-only .leader-score { font-size: 25px; }
   .ranking-only .cheers-note { margin: 0 -16px; }
   .page-footer { margin-top: 25px; padding: 16px 0; font-size: 10px; }
-  .session-bottom { padding: 12px 0 10px; }
-  .new-session { min-width: 132px; font-size: 13px; }
+  .new-session { font-size: 13px; }
   .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, 1fr); padding: 7px 16px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: #f7f6f2f2; backdrop-filter: blur(14px); }
   .mobile-nav button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 3px; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: #8b8579; font-size: 11px; }
   .mobile-nav button.active { color: var(--accent); }

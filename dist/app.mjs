@@ -312,6 +312,7 @@ $('#session-form').addEventListener('submit', event => {
     snapshots = [];
     selectedMemberId = null;
     commit(next, '新一局开始了，祝大家玩得开心', false);
+    $('#settings-dialog').close();
     $('#session-dialog').close();
     switchView('ledger');
   } catch (error) { $('#session-error').textContent = error.message; }
