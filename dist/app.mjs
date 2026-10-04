@@ -106,7 +106,6 @@ function render() {
   $('#demo-notice').hidden = !session.demo;
   $('#member-count').textContent = String(session.members.length).padStart(2, '0');
   if (!session.members.some(member => member.id === selectedMemberId)) selectedMemberId = null;
-  $('#member-list-heading').hidden = !session.members.length;
   $('#members-grid').innerHTML = session.members.length ? session.members.map(member => {
     const name = escapeHTML(member.name);
     const id = escapeHTML(member.id);
@@ -127,16 +126,17 @@ function render() {
 
 function renderMemberControls() {
   const member = session.members.find(item => item.id === selectedMemberId);
-  $('#member-controls').hidden = !session.members.length;
+  $('#member-controls').hidden = !member;
   if (!member) {
-    $('#member-controls').innerHTML = `<div class="member-selection-hint">${icon('wine')}<span>选择一位酒友，即可加减酒或扣减一杯。</span></div>`;
+    $('#member-controls').innerHTML = '';
     return;
   }
   const name = escapeHTML(member.name);
   const id = escapeHTML(member.id);
   const insufficient = member.pending < member.cupSize;
   const limitReached = member.consumed + member.cupSize > MAX_COUNT;
-  $('#member-controls').innerHTML = `<div class="selected-member-heading"><div class="selected-member-identity">${avatar(member)}<div><h3>正在为 <strong>${name}</strong> 记酒</h3><p>已喝 ${number(member.consumed)} 个 · ${number(member.cups)} 杯</p></div></div><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="selected-member-details"><button type="button" class="selected-cup-setting" data-edit="${id}" aria-label="设置${name}的每杯数量">${icon('wine')}1 杯 = ${member.cupSize} 个 ${icon('edit')}</button><span>待喝 <strong>${number(member.pending)}</strong> 个</span></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>${icon('minus')}减酒 <span>−${step}</span></button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>${icon('plus')}加酒 <span>+${step}</span></button><button class="button member-drink" data-action="drink" data-id="${id}" aria-label="${name}喝完一杯，扣减${member.cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('check')}喝完一杯 <span>−${member.cupSize}</span></button></div>${insufficient ? `<p class="selected-member-hint">待喝不足一杯（${member.cupSize} 个），请先加酒或调整杯量。</p>` : limitReached ? '<p class="selected-member-hint">已喝数量已达到上限。</p>' : ''}`;
+  const drinkTitle = insufficient ? `待喝不足一杯（${member.cupSize} 个）` : limitReached ? '已喝数量已达到上限' : `喝完一杯，扣减 ${member.cupSize} 个`;
+  $('#member-controls').innerHTML = `<div class="selected-member-heading"><h3 class="selected-member-name">${name}</h3><button type="button" class="selected-cup-setting" data-edit="${id}" aria-label="设置${name}的每杯数量">1 杯 = ${member.cupSize} 个</button><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>−${step}</button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>+${step}</button><button class="button member-drink" data-action="drink" data-id="${id}" title="${drinkTitle}" aria-label="${name}喝完一杯，扣减${member.cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('wine')}<span>−${member.cupSize}</span></button></div>`;
 }
 
 function switchView(nextView) {
