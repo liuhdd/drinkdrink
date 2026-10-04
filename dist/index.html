@@ -7,8 +7,8 @@
     <meta name="description" content="微醺账本，轻松管理酒局成员、加减酒、按杯扣减与单局排行榜。" />
     <title>微醺账本 · 酒局记账</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23f2e5dc'/%3E%3Cpath d='M9 8h14l-2 9H11zM16 17v7m-5 0h10' fill='none' stroke='%23ac573f' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./style.css?v=20261004-history" />
-    <script type="module" src="./app.mjs?v=20261004-history"></script>
+    <link rel="stylesheet" href="./style.css?v=20261004-dropdown" />
+    <script type="module" src="./app.mjs?v=20261004-dropdown"></script>
   </head>
   <body>
     <header class="site-header">
@@ -43,7 +43,6 @@
     <dialog id="add-members-dialog" aria-labelledby="add-members-title">
       <form id="add-members-form">
         <div class="dialog-heading"><div><span class="eyebrow">YOUR DRINKING CREW</span><h2 id="add-members-title">添加酒友</h2></div><button type="button" class="icon-button" data-close aria-label="关闭"><span data-icon="x"></span></button></div>
-        <section class="known-members" aria-label="选择以前添加过的酒友"><h3>以前的酒友</h3><p class="form-hint">可多选，只显示尚未加入本局的酒友。</p><div id="known-members-list" class="known-members-list"></div></section>
         <div id="draft-members" class="draft-members"></div>
         <button type="button" id="append-member" class="button secondary append-member" data-add-draft><span data-icon="plus"></span>再加一位</button>
         <p id="add-members-error" class="form-error" role="alert"></p>

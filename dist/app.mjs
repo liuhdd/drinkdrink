@@ -223,30 +223,49 @@ function updateMemberDrafts() {
 }
 
 function renderKnownMembers() {
-  const selected = new Set([...$('#draft-members').children].map(row => row.dataset.knownMemberId).filter(Boolean));
-  const names = new Set([...$('#draft-members').querySelectorAll('.draft-name')].map(input => input.value.trim().toLowerCase()).filter(Boolean));
+  const rows = [...$('#draft-members').children];
   const available = availableMembers(ledger.knownMembers, session);
-  const full = session.members.length + $('#draft-members').children.length >= 30;
-  const blankRow = [...$('#draft-members').children].some(row => !row.dataset.knownMemberId && !row.querySelector('.draft-name').value.trim());
-  $('#known-members-list').innerHTML = available.map(member => {
-    const chosen = selected.has(member.id);
-    const disabled = !chosen && ((full && !blankRow) || names.has(member.name.toLowerCase()));
-    return `<button type="button" class="known-member${chosen ? ' chosen' : ''}" data-known-member="${escapeHTML(member.id)}" aria-pressed="${chosen}" ${disabled ? 'disabled' : ''}>${avatar(member)}<span>${escapeHTML(member.name)}</span>${icon(chosen ? 'check' : 'plus')}</button>`;
-  }).join('') || `<p class="form-hint">${ledger.knownMembers.length ? '已保存的酒友都在本局中了。' : '添加过的酒友会保存在这里，方便下次选择。'}</p>`;
+  for (const row of rows) {
+    const otherRows = rows.filter(item => item !== row);
+    const ids = new Set(otherRows.map(item => item.dataset.knownMemberId).filter(Boolean));
+    const names = new Set(otherRows.map(item => item.querySelector('.draft-name').value.trim().toLowerCase()).filter(Boolean));
+    const choices = available.filter(member => !ids.has(member.id) && !names.has(member.name.toLowerCase()));
+    row.querySelector('.draft-options').innerHTML = choices.map(member => `<button type="button" class="draft-option" role="option" data-pick-member="${escapeHTML(member.id)}" aria-selected="${row.dataset.knownMemberId === member.id}"><span aria-hidden="true">${avatar(member)}</span><span>${escapeHTML(member.name)}</span></button>`).join('');
+    row.querySelector('[data-toggle-members]').disabled = !choices.length;
+    if (!choices.length) closeMemberOptions(row);
+  }
 }
 
-function appendMemberDraft(profile) {
+function closeMemberOptions(onlyRow) {
+  const rows = onlyRow ? [onlyRow] : [...$('#draft-members').children];
+  for (const row of rows) {
+    row.querySelector('.draft-options').hidden = true;
+    row.querySelector('.draft-name').setAttribute('aria-expanded', 'false');
+  }
+}
+
+function openMemberOptions(row) {
+  closeMemberOptions();
+  const list = row.querySelector('.draft-options');
+  if (!list.children.length) return;
+  const field = row.querySelector('.member-name-field').getBoundingClientRect();
+  const dialog = $('#add-members-dialog').getBoundingClientRect();
+  const below = dialog.bottom - field.bottom - 16;
+  const above = field.top - dialog.top - 16;
+  const upwards = below < 88 && above > below;
+  list.dataset.placement = upwards ? 'above' : 'below';
+  list.style.maxHeight = `${Math.max(44, Math.min(180, upwards ? above : below))}px`;
+  list.hidden = false;
+  row.querySelector('.draft-name').setAttribute('aria-expanded', 'true');
+}
+
+function appendMemberDraft() {
   if (session.members.length + $('#draft-members').children.length >= 30) return;
   const index = ++draftMemberIndex;
   const row = document.createElement('div');
   row.className = 'member-draft-row';
-  row.innerHTML = `<label>昵称<input class="draft-name" id="draft-name-${index}" aria-label="成员${index}昵称" maxlength="12" placeholder="酒友昵称" required autocomplete="off" /></label><label>待喝（个）<input class="draft-pending" id="draft-pending-${index}" aria-label="成员${index}待喝数量" type="number" min="0" max="9999" step="1" value="0" required /></label><button type="button" class="icon-button remove-draft" data-remove-draft aria-label="移除成员${index}输入">${icon('x')}</button>`;
+  row.innerHTML = `<label>昵称<span class="member-name-field"><input class="draft-name" id="draft-name-${index}" aria-label="成员${index}昵称" role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="draft-options-${index}" maxlength="12" placeholder="输入或选择" required autocomplete="off" /><button type="button" class="draft-dropdown-toggle" data-toggle-members aria-label="选择成员${index}以前的酒友">${icon('chevron')}</button><span class="draft-options" id="draft-options-${index}" role="listbox" aria-label="成员${index}可选酒友" hidden></span></span></label><label>待喝（个）<input class="draft-pending" id="draft-pending-${index}" aria-label="成员${index}待喝数量" type="number" min="0" max="9999" step="1" value="0" required /></label><button type="button" class="icon-button remove-draft" data-remove-draft aria-label="移除成员${index}输入">${icon('x')}</button>`;
   $('#draft-members').append(row);
-  if (profile) {
-    row.dataset.knownMemberId = profile.id;
-    row.querySelector('.draft-name').value = profile.name;
-    row.querySelector('.draft-name').readOnly = true;
-  }
   updateMemberDrafts();
   return row;
 }
@@ -290,27 +309,24 @@ function openDialog(name) {
 }
 
 document.addEventListener('click', async event => {
+  if (!event.target.closest('.member-name-field')) closeMemberOptions();
   const button = event.target.closest('button');
   if (!button || button.disabled) return;
   if (button.dataset.view) switchView(button.dataset.view);
   if (button.dataset.history) openHistory(button.dataset.history);
   if (button.hasAttribute('data-retry-storage')) await initialize();
-  if (button.dataset.knownMember) {
-    const id = button.dataset.knownMember;
-    const selectedRow = [...$('#draft-members').children].find(row => row.dataset.knownMemberId === id);
-    if (selectedRow) {
-      selectedRow.remove();
-      if (!$('#draft-members').children.length) appendMemberDraft();
-    } else {
-      const profile = availableMembers(ledger.knownMembers, session).find(member => member.id === id);
-      if (!profile) return;
-      const blankRow = [...$('#draft-members').children].find(row => !row.dataset.knownMemberId && !row.querySelector('.draft-name').value.trim());
-      if (blankRow) {
-        blankRow.dataset.knownMemberId = id;
-        blankRow.querySelector('.draft-name').value = profile.name;
-        blankRow.querySelector('.draft-name').readOnly = true;
-      } else appendMemberDraft(profile);
-    }
+  if (button.hasAttribute('data-toggle-members')) {
+    const row = button.closest('.member-draft-row');
+    if (row.querySelector('.draft-options').hidden) openMemberOptions(row); else closeMemberOptions();
+  }
+  if (button.dataset.pickMember) {
+    const row = button.closest('.member-draft-row');
+    const profile = availableMembers(ledger.knownMembers, session).find(member => member.id === button.dataset.pickMember);
+    if (!profile) return;
+    row.dataset.knownMemberId = profile.id;
+    row.querySelector('.draft-name').value = profile.name;
+    row.querySelector('.draft-name').focus();
+    closeMemberOptions();
     updateMemberDrafts();
     $('#add-members-error').textContent = '';
   }
@@ -347,7 +363,38 @@ document.addEventListener('click', async event => {
   }
 });
 
-$('#draft-members').addEventListener('input', renderKnownMembers);
+$('#draft-members').addEventListener('input', event => {
+  if (!event.target.matches('.draft-name')) return;
+  const row = event.target.closest('.member-draft-row');
+  delete row.dataset.knownMemberId;
+  const profile = availableMembers(ledger.knownMembers, session).find(member => member.name.toLowerCase() === event.target.value.trim().toLowerCase());
+  if (profile) row.dataset.knownMemberId = profile.id;
+  renderKnownMembers();
+  $('#add-members-error').textContent = '';
+});
+$('#draft-members').addEventListener('focusin', event => {
+  if (event.target.matches('.draft-name')) openMemberOptions(event.target.closest('.member-draft-row'));
+  else if (!event.target.closest('.member-name-field')) closeMemberOptions();
+});
+$('#draft-members').addEventListener('keydown', event => {
+  const row = event.target.closest('.member-draft-row');
+  if (!row || !event.target.closest('.member-name-field')) return;
+  if (event.key === 'Escape' && !row.querySelector('.draft-options').hidden) {
+    event.preventDefault();
+    event.stopPropagation();
+    row.querySelector('.draft-name').focus();
+    closeMemberOptions();
+  } else if (event.key === 'Tab') closeMemberOptions();
+  else if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+    event.preventDefault();
+    const list = row.querySelector('.draft-options');
+    if (list.hidden) openMemberOptions(row);
+    const options = [...list.children];
+    const current = options.indexOf(event.target);
+    const next = current < 0 ? (event.key === 'ArrowDown' ? 0 : options.length - 1) : (current + (event.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length;
+    options[next]?.focus();
+  }
+});
 
 $('.brand').addEventListener('click', event => { event.preventDefault(); switchView('ledger'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 $('#undo-button').addEventListener('click', undo);
