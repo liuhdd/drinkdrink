@@ -1,5 +1,6 @@
 import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from './domain.mjs?v=20261004-history';
 import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession } from './persistence.mjs?v=20261004-history';
+import { loadDeviceLedger, saveDeviceLedger, STORAGE_KEY } from './device-storage.mjs?v=20261004-device';
 
 const paths = {
   wine: '<path d="M8 3h8l1 6a5 5 0 0 1-10 0l1-6ZM12 14v7m-4 0h8M7.5 8h9"/>',
@@ -36,7 +37,6 @@ const colors = [
 const colorStyle = color => `--avatar-bg:${colors[color]?.bg || colors[0].bg};--avatar-fg:${colors[color]?.fg || colors[0].fg}`;
 const avatar = (member, extra = '') => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
 const number = value => Number(value).toLocaleString('zh-CN');
-const STORAGE_KEY = 'cheers-ledger-v1';
 let ledger = emptyLedger();
 let session = ledger.session;
 let step = 1;
@@ -50,7 +50,6 @@ let editId = null;
 let selectedColor = 0;
 let draftMemberIndex = 0;
 let toastTimer;
-const syncChannel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('cheers-ledger-sync') : null;
 
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -67,21 +66,21 @@ function applyLedger(value, nextRevision) {
   revision = nextRevision;
 }
 
-async function requestStorage(options) {
-  let response;
-  let data;
+async function saveToDevice(value, expectedRevision) {
   try {
-    response = await fetch('/api/ledger', { ...options, signal: AbortSignal.timeout(10000) });
-    data = await response.json();
-  } catch { throw new Error('网络或记录服务暂时不可用，输入已保留，请重试'); }
-  if (response.status === 409 && data.ledger) {
-    applyLedger(data.ledger, data.revision);
-    snapshots = [];
-    render();
-    if ($('#add-members-dialog').open) updateMemberDrafts();
+    const save = () => saveDeviceLedger(localStorage, value, expectedRevision);
+    // Serialize same-origin tab writes when the browser supports Web Locks.
+    return navigator.locks?.request ? await navigator.locks.request(STORAGE_KEY, save) : save();
+  } catch (error) {
+    if (error.data) {
+      applyLedger(error.data.ledger, error.data.revision);
+      snapshots = [];
+      render();
+      if ($('#add-members-dialog').open) updateMemberDrafts();
+      throw error;
+    }
+    throw new Error('本机保存失败，浏览器存储可能不可用或空间不足。输入已保留，请重试');
   }
-  if (!response.ok) throw new Error(data.error || '保存失败，请重试');
-  return data;
 }
 
 async function commit(nextSession, message, undoable = true, changes = {}) {
@@ -96,7 +95,7 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
   saving = true;
   saveStatus('正在保存…');
   try {
-    const data = await requestStorage({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ledger: next, revision }) });
+    const data = await saveToDevice(next, revision);
     if (undoable) snapshots = [...snapshots, structuredClone(session)].slice(-30);
     applyLedger(next, data.revision);
   } catch (error) {
@@ -106,9 +105,8 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
     toast(error.message || '保存失败，请重试', { error: true });
     return false;
   } finally { saving = false; }
-  saveStatus('已自动保存');
+  saveStatus('本机已自动保存');
   render();
-  syncChannel?.postMessage({ revision });
   if (message) toast(message, { undo: undoable });
   return true;
 }
@@ -492,24 +490,26 @@ document.querySelectorAll('dialog').forEach(dialog => {
   });
 });
 
-async function syncFromServer() {
+function syncFromDevice() {
   if (!ready || saving || document.querySelector('dialog[open]')) return;
   try {
-    const data = await requestStorage();
+    const data = loadDeviceLedger(localStorage);
     if (saving || document.querySelector('dialog[open]') || !data.ledger) return;
-    if (data.revision === revision) { saveStatus('已自动保存'); return; }
+    if (data.revision === revision) { saveStatus('本机已自动保存'); return; }
     if (data.revision < revision) return;
     applyLedger(data.ledger, data.revision);
     snapshots = [];
     render();
-    saveStatus('已自动保存');
-    toast('已同步最新酒局和历史记录');
-  } catch { /* Keep the current view; writes still require a successful server save. */ }
+    saveStatus('本机已自动保存');
+    toast('已同步本机另一页面的记录');
+  } catch { saveStatus('本机记录无法读取', true); }
 }
 
-syncChannel?.addEventListener('message', syncFromServer);
-window.addEventListener('focus', syncFromServer);
-document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', syncFromServer));
+window.addEventListener('storage', event => {
+  if (event.key === STORAGE_KEY || event.key === null) syncFromDevice();
+});
+window.addEventListener('focus', syncFromDevice);
+document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', syncFromDevice));
 
 async function initialize() {
   if (saving) return;
@@ -521,23 +521,13 @@ async function initialize() {
   $('#history-panel').hidden = true;
   saveStatus('正在加载…');
   try {
-    let data = await requestStorage();
-    if (!data.ledger) {
-      let raw;
-      try { raw = localStorage.getItem(STORAGE_KEY); } catch { /* Browser storage is optional for legacy import. */ }
-      let initial = emptyLedger();
-      if (raw) {
-        try { initial = restoreLedger(JSON.parse(raw)); }
-        catch { throw new Error('旧版本机记录无法读取，原记录已保留，请联系维护者'); }
-      }
+    let data = loadDeviceLedger(localStorage);
+    if (data.revision === 0) {
       try {
-        const saved = await requestStorage({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ledger: initial, revision: 0 }) });
-        data = { ledger: initial, revision: saved.revision };
+        data = await saveToDevice(data.ledger, 0);
       } catch (error) {
-        // Another tab can win the first import; prefer that saved state.
-        const latest = await requestStorage();
-        if (!latest.ledger) throw error;
-        data = latest;
+        if (!error.data) throw error;
+        data = error.data;
       }
     }
     applyLedger(data.ledger, data.revision);
@@ -546,10 +536,10 @@ async function initialize() {
     render();
     switchView(view);
     $('#load-notice').hidden = true;
-    saveStatus('已自动保存');
+    saveStatus('本机已自动保存');
   } catch (error) {
     ready = false;
-    $('#load-message').textContent = error.message || '暂时无法加载记录，请重试';
+    $('#load-message').textContent = '本机记录无法读取，原记录已保留。请检查浏览器存储权限后重试';
     $('#retry-storage').hidden = false;
     saveStatus('记录未加载', true);
   }
