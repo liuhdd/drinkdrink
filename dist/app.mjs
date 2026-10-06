@@ -1,6 +1,6 @@
 import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from './domain.mjs?v=20261004-history';
 import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession } from './persistence.mjs?v=20261004-history';
-import { loadDeviceLedger, saveDeviceLedger, STORAGE_KEY } from './device-storage.mjs?v=20261004-device';
+import { createDeviceClient, SYNC_KEY } from './server-storage.mjs?v=20261006-server';
 
 const paths = {
   wine: '<path d="M8 3h8l1 6a5 5 0 0 1-10 0l1-6ZM12 14v7m-4 0h8M7.5 8h9"/>',
@@ -41,6 +41,10 @@ let ledger = emptyLedger();
 let session = ledger.session;
 let step = 1;
 let revision = 0;
+let generation = null;
+let deviceClient;
+let ledgerEpoch = 0;
+let syncSequence = 0;
 let ready = false;
 let saving = false;
 let view = 'ledger';
@@ -59,27 +63,27 @@ function saveStatus(text, error = false) {
   $('#save-status').innerHTML = `${icon(error ? 'info' : 'cloud-check')}<span>${escapeHTML(text)}</span>`;
 }
 
-function applyLedger(value, nextRevision) {
+function applyLedger(value, nextRevision, nextGeneration) {
+  ledgerEpoch++;
   ledger = restoreLedger(value);
   session = ledger.session;
   step = ledger.step;
   revision = nextRevision;
+  generation = nextGeneration;
 }
 
-async function saveToDevice(value, expectedRevision) {
+async function saveToServer(value, expectedRevision) {
   try {
-    const save = () => saveDeviceLedger(localStorage, value, expectedRevision);
-    // Serialize same-origin tab writes when the browser supports Web Locks.
-    return navigator.locks?.request ? await navigator.locks.request(STORAGE_KEY, save) : save();
+    return await deviceClient.save(value, expectedRevision, generation);
   } catch (error) {
     if (error.data) {
-      applyLedger(error.data.ledger, error.data.revision);
+      applyLedger(error.data.ledger ?? emptyLedger(), error.data.revision, error.data.generation);
       snapshots = [];
       render();
       if ($('#add-members-dialog').open) updateMemberDrafts();
       throw error;
     }
-    throw new Error('本机保存失败，浏览器存储可能不可用或空间不足。输入已保留，请重试');
+    throw error;
   }
 }
 
@@ -95,9 +99,9 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
   saving = true;
   saveStatus('正在保存…');
   try {
-    const data = await saveToDevice(next, revision);
+    const data = await saveToServer(next, revision);
     if (undoable) snapshots = [...snapshots, structuredClone(session)].slice(-30);
-    applyLedger(next, data.revision);
+    applyLedger(data.ledger, data.revision, data.generation);
   } catch (error) {
     saveStatus('未保存 · 请重试', true);
     const formError = [...document.querySelectorAll('dialog[open]')].at(-1)?.querySelector('.form-error');
@@ -105,7 +109,7 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
     toast(error.message || '保存失败，请重试', { error: true });
     return false;
   } finally { saving = false; }
-  saveStatus('本机已自动保存');
+  saveStatus('服务端已自动保存');
   render();
   if (message) toast(message, { undo: undoable });
   return true;
@@ -490,26 +494,30 @@ document.querySelectorAll('dialog').forEach(dialog => {
   });
 });
 
-function syncFromDevice() {
+async function syncFromServer() {
   if (!ready || saving || document.querySelector('dialog[open]')) return;
+  const sequence = ++syncSequence;
+  const epoch = ledgerEpoch;
   try {
-    const data = loadDeviceLedger(localStorage);
-    if (saving || document.querySelector('dialog[open]') || !data.ledger) return;
-    if (data.revision === revision) { saveStatus('本机已自动保存'); return; }
-    if (data.revision < revision) return;
-    applyLedger(data.ledger, data.revision);
+    const data = await deviceClient.load();
+    if (sequence !== syncSequence || epoch !== ledgerEpoch || saving || document.querySelector('dialog[open]')) return;
+    if (data.revision === revision && data.generation === generation) { saveStatus('服务端已自动保存'); return; }
+    if (data.generation === generation && data.revision < revision) return;
+    applyLedger(data.ledger ?? emptyLedger(), data.revision, data.generation);
     snapshots = [];
     render();
-    saveStatus('本机已自动保存');
-    toast('已同步本机另一页面的记录');
-  } catch { saveStatus('本机记录无法读取', true); }
+    saveStatus(data.ledger ? '服务端已自动保存' : '旧数据已自动清理');
+    toast(data.ledger ? '已同步服务端记录' : '超过 30 天的记录已自动清理');
+  } catch { if (sequence === syncSequence && epoch === ledgerEpoch && !saving) saveStatus('服务端暂时无法连接', true); }
 }
 
 window.addEventListener('storage', event => {
-  if (event.key === STORAGE_KEY || event.key === null) syncFromDevice();
+  if (event.key === SYNC_KEY) syncFromServer();
 });
-window.addEventListener('focus', syncFromDevice);
-document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', syncFromDevice));
+window.addEventListener('focus', syncFromServer);
+window.addEventListener('online', syncFromServer);
+document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', syncFromServer));
+setInterval(() => { if (!document.hidden) syncFromServer(); }, 60_000);
 
 async function initialize() {
   if (saving) return;
@@ -521,25 +529,19 @@ async function initialize() {
   $('#history-panel').hidden = true;
   saveStatus('正在加载…');
   try {
-    let data = loadDeviceLedger(localStorage);
-    if (data.revision === 0) {
-      try {
-        data = await saveToDevice(data.ledger, 0);
-      } catch (error) {
-        if (!error.data) throw error;
-        data = error.data;
-      }
-    }
-    applyLedger(data.ledger, data.revision);
+    deviceClient ??= createDeviceClient({ storage: localStorage });
+    const load = () => deviceClient.initialize();
+    const data = navigator.locks?.request ? await navigator.locks.request('cheers-device-initialize', load) : await load();
+    applyLedger(data.ledger, data.revision, data.generation);
     ready = true;
     snapshots = [];
     render();
     switchView(view);
     $('#load-notice').hidden = true;
-    saveStatus('本机已自动保存');
+    saveStatus('服务端已自动保存');
   } catch (error) {
     ready = false;
-    $('#load-message').textContent = '本机记录无法读取，原记录已保留。请检查浏览器存储权限后重试';
+    $('#load-message').textContent = error.message || '记录无法加载，请检查网络和浏览器存储权限后重试';
     $('#retry-storage').hidden = false;
     saveStatus('记录未加载', true);
   }

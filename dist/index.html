@@ -8,7 +8,7 @@
     <title>微醺账本 · 酒局记账</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23f2e5dc'/%3E%3Cpath d='M9 8h14l-2 9H11zM16 17v7m-5 0h10' fill='none' stroke='%23ac573f' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./style.css?v=20261004-device" />
-    <script type="module" src="./app.mjs?v=20261004-device"></script>
+    <script type="module" src="./app.mjs?v=20261006-server"></script>
   </head>
   <body>
     <header class="site-header">
@@ -36,8 +36,8 @@
           <div class="cheers-note"><span data-icon="cheers"></span><p>开心碰杯，量力而行。</p><span>好朋友的局，尽兴就好</span></div>
         </aside>
       </div>
-      <section id="history-panel" class="history-panel" aria-label="历史酒局" hidden><div class="section-heading"><h2>历史酒局 <span id="history-count" class="count-badge">0</span></h2><button class="button secondary" data-open="new-session"><span data-icon="plus"></span>新开一局</button></div><div id="history-list" class="history-list"></div><p class="form-hint">历史酒局保留结束时的成员、计数、排行和最近 80 条操作记录。</p></section>
-      <footer class="page-footer"><span class="footer-brand">微醺账本 <span>·</span> 让每一杯都有数</span><span id="save-status"><span data-icon="cloud-check"></span>正在加载…</span></footer>
+      <section id="history-panel" class="history-panel" aria-label="历史酒局" hidden><div class="section-heading"><h2>历史酒局 <span id="history-count" class="count-badge">0</span></h2><button class="button secondary" data-open="new-session"><span data-icon="plus"></span>新开一局</button></div><div id="history-list" class="history-list"></div><p class="form-hint">历史酒局保留结束时的成员、计数、排行和最近 80 条操作记录，超过 30 天自动删除。</p></section>
+      <footer class="page-footer"><span class="footer-brand">按设备保存 <span>·</span> 记录保留 30 天</span><span id="save-status"><span data-icon="cloud-check"></span>正在加载…</span></footer>
     </main>
     <nav class="mobile-nav" aria-label="移动导航"><button data-view="ledger" class="active"><span data-icon="grid"></span>记账</button><button data-view="ranking"><span data-icon="trophy"></span>排行</button><button data-view="history"><span data-icon="history"></span>历史</button><button data-open="settings"><span data-icon="settings"></span>设置</button></nav>
     <dialog id="add-members-dialog" aria-labelledby="add-members-title">
