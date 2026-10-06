@@ -1,4 +1,5 @@
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { build } from 'esbuild';
 
 // The original buildless files remain the editable frontend sources.
 await mkdir('dist/client', { recursive: true });
@@ -7,10 +8,8 @@ await mkdir('dist/.openai', { recursive: true });
 for (const file of ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'style.css']) {
   await cp(`dist/${file}`, `dist/client/${file}`);
 }
-const worker = (await readFile('server/worker.mjs', 'utf8')).replace("'../dist/persistence.mjs'", "'../client/persistence.mjs'");
-await writeFile('dist/server/index.js', worker);
-const retention = (await readFile('server/retention.mjs', 'utf8')).replaceAll("'../dist/", "'../client/");
-await writeFile('dist/server/retention.mjs', retention);
+await build({ entryPoints: ['server/worker.mjs'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile: 'dist/server/index.js' });
+await rm('dist/server/retention.mjs', { force: true });
 await cp('.openai/hosting.json', 'dist/.openai/hosting.json');
 await cp('drizzle', 'dist/.openai/drizzle', { recursive: true });
 await writeFile('dist/server/wrangler.json', JSON.stringify({
