@@ -40,7 +40,18 @@ svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
 .settings-button svg { width: 18px; height: 18px; }
 
 .page { max-width: 1200px; padding: 40px 40px 24px; margin: auto; }
-.page-heading { margin-bottom: 34px; }
+.page-heading { margin-bottom: 34px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.session-complete .live-dot { background: var(--muted); box-shadow: none; }
+.page-heading > div { min-width: 0; }
+.page-heading > .button { flex-shrink: 0; }
+#session-title { overflow-wrap: anywhere; }
+.finished-session { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px; margin-bottom: 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--accent-soft); }
+.finished-session strong { font-family: var(--serif); font-size: 21px; font-weight: 500; }
+.finished-session p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.finished-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.summary-dialog { width: min(620px, calc(100vw - 32px)); }
+.summary-preview { display: block; width: 100%; height: auto; margin-top: 16px; border: 1px solid var(--border); border-radius: 8px; }
+input:disabled { opacity: .6; }
 .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: 1.4px; }
 .live-dot { height: 6px; width: 6px; border-radius: 50%; background: var(--accent); }
 .demo-badge { padding: 2px 7px; margin-left: 3px; border-radius: 5px; background: var(--surface-up); color: var(--muted); font-size: 11px; letter-spacing: 0; }

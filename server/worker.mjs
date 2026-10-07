@@ -76,13 +76,17 @@ export default {
         data = JSON.parse(new TextDecoder().decode(raw));
         if (!Number.isSafeInteger(data.revision) || data.revision < 0 || data.ledger?.version !== 2 || (data.revision > 0 && !uuid.test(data.generation ?? ''))) throw new Error();
         ledger = restoreLedger(data.ledger);
-        const dates = [ledger.session.startedAt, ...ledger.session.events.map(event => event.at),
+        const dates = [ledger.session.startedAt, ...(ledger.session.endedAt === undefined ? [] : [ledger.session.endedAt]), ...ledger.session.events.map(event => event.at),
           ...ledger.history.flatMap(entry => [entry.endedAt, entry.session.startedAt, ...entry.session.events.map(event => event.at)])];
         if (dates.some(at => at > now + 5 * 60 * 1000)) throw new Error();
       } catch { return json({ error: '记录格式无效，未修改已保存数据' }, 400); }
       const current = await readCurrent(env.DB, deviceId, now);
       if ((current?.revision ?? 0) !== data.revision || (current && current.generation !== data.generation)) return json({ ...responseData(current), error: '另一页面已更新记录或旧数据已清理，已同步，请重试' }, 409);
-      const kept = prepareLedger(ledger, current ? JSON.parse(current.data) : null, now);
+      const previous = current ? JSON.parse(current.data) : null;
+      const finished = previous?.ledger.session;
+      if (finished?.endedAt !== undefined && ledger.session.startedAt === finished.startedAt && ledger.session.round === finished.round
+        && JSON.stringify(ledger.session) !== JSON.stringify(restoreLedger(previous.ledger).session)) return json({ error: '本局已结束，请新开一局，最终记录未修改' }, 400);
+      const kept = prepareLedger(ledger, previous, now);
       const encoded = JSON.stringify({ ledger: kept.ledger, memberSeen: kept.memberSeen });
       const generation = current?.generation ?? crypto.randomUUID();
       const result = current

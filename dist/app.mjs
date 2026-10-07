@@ -1,6 +1,7 @@
-import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from './domain.mjs?v=20261004-history';
-import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession } from './persistence.mjs?v=20261004-history';
+import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from './domain.mjs?v=20261007-summary';
+import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession, finishSession } from './persistence.mjs?v=20261007-summary';
 import { createDeviceClient, SYNC_KEY } from './server-storage.mjs?v=20261006-server';
+import { createSummaryImage } from './summary.mjs?v=20261007-summary';
 
 const paths = {
   wine: '<path d="M8 3h8l1 6a5 5 0 0 1-10 0l1-6ZM12 14v7m-4 0h8M7.5 8h9"/>',
@@ -22,6 +23,7 @@ const paths = {
   x: '<path d="m6 6 12 12M6 18 18 6"/>',
   chevron: '<path d="m9 5 7 7-7 7"/>',
   sparkles: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4m-2-2h4"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/>',
 };
 const icon = name => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ''}</svg>`;
 const $ = selector => document.querySelector(selector);
@@ -54,6 +56,9 @@ let editId = null;
 let selectedColor = 0;
 let draftMemberIndex = 0;
 let toastTimer;
+let summaryTarget;
+let summaryImage;
+let summarySequence = 0;
 
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
@@ -90,6 +95,10 @@ async function saveToServer(value, expectedRevision) {
 async function commit(nextSession, message, undoable = true, changes = {}) {
   if (!ready || saving) {
     toast(saving ? '正在保存，请稍等' : '请先重新加载记录', { error: true });
+    return false;
+  }
+  if (session.endedAt !== undefined && nextSession.startedAt === session.startedAt && nextSession.round === session.round) {
+    toast('本局已结束，请新开一局', { error: true });
     return false;
   }
   const next = {
@@ -138,6 +147,15 @@ function render() {
   $('#ranking-round').textContent = `第 ${String(session.round).padStart(2, '0')} 局`;
   $('#session-date').textContent = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' }).format(session.startedAt);
   $('#demo-badge').hidden = !session.demo;
+  const finished = session.endedAt !== undefined;
+  $('.page-heading').classList.toggle('session-complete', finished);
+  $('#ranking-live-label').textContent = finished ? '最终结果' : '实时更新';
+  $('#end-session-button').hidden = session.demo || finished;
+  $('#finished-session').hidden = !finished;
+  if (finished) $('#finished-session-message').textContent = `${dateTime(session.endedAt)} 结束 · 最终记录已保存，可生成分享图或新开一局。`;
+  document.querySelectorAll('[data-open="add-member"]').forEach(button => { button.hidden = finished; });
+  $('#settings-form').querySelectorAll('input, button[type="submit"]').forEach(control => { control.disabled = finished; });
+  $('#settings-finished-hint').hidden = !finished;
   $('#member-count').textContent = String(session.members.length).padStart(2, '0');
   if (!session.members.some(member => member.id === selectedMemberId)) selectedMemberId = null;
   $('#members-grid').innerHTML = session.members.length ? session.members.map(member => {
@@ -145,7 +163,7 @@ function render() {
     const id = escapeHTML(member.id);
     const selected = member.id === selectedMemberId;
     return `<button type="button" class="member-row${selected ? ' selected' : ''}" data-select-member="${id}" aria-pressed="${selected}" aria-label="选择${name}，待喝${member.pending}个" style="${colorStyle(member.color)}"><span class="member-row-identity">${avatar(member)}<span class="member-row-name">${name}</span>${selected ? `<span class="member-selected-mark">${icon('check')}</span>` : ''}</span><span class="member-row-count"><strong>${number(member.pending)}</strong><span>个</span></span></button>`;
-  }).join('') : `<div class="empty-members"><span data-icon="users"></span><h3>酒友到齐，就开局</h3><p>添加第一位成员，开始记录今晚的每一杯。</p><button class="button primary" data-open="add-member">${icon('plus')}添加成员</button></div>`;
+  }).join('') : finished ? '<div class="empty-members"><h3>本局已结束</h3><p>这一局没有添加成员，可以新开一局继续记录。</p></div>' : `<div class="empty-members"><span data-icon="users"></span><h3>酒友到齐，就开局</h3><p>添加第一位成员，开始记录今晚的每一杯。</p><button class="button primary" data-open="add-member">${icon('plus')}添加成员</button></div>`;
   renderMemberControls();
   const ranked = leaderboard(session);
   const max = ranked[0]?.consumed || 1;
@@ -154,7 +172,7 @@ function render() {
     const text = event.action === 'drink' ? `喝完一杯 <em>扣减 ${event.amount} 个</em>` : event.action === 'add' ? `加了 <em>+${event.amount} 个</em>` : event.action === 'subtract' ? `减去 <em>−${event.amount} 个</em>` : `待喝调整为 <em>${event.amount} 个</em>`;
     return `<div class="activity-row">${avatar(event, 'activity-avatar')}<div class="activity-message"><strong>${escapeHTML(event.name)}</strong>${text}</div><time class="activity-time" datetime="${new Date(event.at).toISOString()}">${new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.at)}</time></div>`;
   }).join('') : `<div class="activity-empty">${icon('history')}每次加减、喝完都会记在这里</div>`;
-  $('#undo-button').disabled = !snapshots.length;
+  $('#undo-button').disabled = finished || !snapshots.length;
   hydrateIcons($('#members-grid'));
   renderHistory();
 }
@@ -180,7 +198,60 @@ function openHistory(id) {
     return `<div class="activity-row"><div class="activity-message"><strong>${escapeHTML(event.name)}</strong>${text} ${event.amount} 个</div><time class="activity-time">${escapeHTML(dateTime(event.at))}</time></div>`;
   }).join('') || '<p class="form-hint">这局没有操作记录。</p>';
   $('#history-detail-dialog').showModal();
+  $('#history-summary-button').dataset.summaryHistory = entry.id;
 }
+
+function clearSummaryImage() {
+  if (summaryImage) URL.revokeObjectURL(summaryImage.url);
+  summaryImage = null;
+  $('#summary-preview').removeAttribute('src');
+  $('#summary-preview').hidden = true;
+  $('#summary-download').removeAttribute('href');
+  $('#summary-download').hidden = true;
+  $('#summary-share').hidden = true;
+}
+
+async function openSummary(source, endedAt) {
+  summaryTarget = { session: structuredClone(source), endedAt };
+  const sequence = ++summarySequence;
+  clearSummaryImage();
+  $('#summary-status').textContent = '正在生成图片…';
+  $('#summary-error').textContent = '';
+  $('#summary-retry').hidden = true;
+  if (!$('#summary-dialog').open) $('#summary-dialog').showModal();
+  try {
+    const result = await createSummaryImage(summaryTarget.session, endedAt);
+    if (sequence !== summarySequence || !$('#summary-dialog').open) return;
+    const url = URL.createObjectURL(result.blob);
+    summaryImage = { ...result, url };
+    $('#summary-preview').src = url;
+    $('#summary-preview').hidden = false;
+    $('#summary-download').href = url;
+    $('#summary-download').download = result.filename;
+    $('#summary-download').hidden = false;
+    try {
+      summaryImage.file = new File([result.blob], result.filename, { type: 'image/png' });
+      $('#summary-share').hidden = !navigator.share || !navigator.canShare?.({ files: [summaryImage.file] });
+    } catch { /* Download and long-press saving remain available. */ }
+    $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
+  } catch (error) {
+    if (sequence !== summarySequence || !$('#summary-dialog').open) return;
+    $('#summary-status').textContent = '图片暂未生成';
+    $('#summary-error').textContent = error.message || '图片生成失败，请重试';
+    $('#summary-retry').hidden = false;
+  }
+}
+
+$('#summary-dialog').addEventListener('close', () => { summarySequence++; clearSummaryImage(); summaryTarget = null; });
+$('#summary-retry').addEventListener('click', () => { if (summaryTarget) openSummary(summaryTarget.session, summaryTarget.endedAt); });
+$('#summary-share').addEventListener('click', async () => {
+  if (!summaryImage?.file) return;
+  const button = $('#summary-share');
+  button.disabled = true;
+  try { await navigator.share({ files: [summaryImage.file], title: `${summaryImage.summary.title} · 酒局总结` }); }
+  catch (error) { if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
+  finally { button.disabled = false; }
+});
 
 function renderMemberControls() {
   const member = session.members.find(item => item.id === selectedMemberId);
@@ -191,6 +262,10 @@ function renderMemberControls() {
   }
   const name = escapeHTML(member.name);
   const id = escapeHTML(member.id);
+  if (session.endedAt !== undefined) {
+    $('#member-controls').innerHTML = `<div class="selected-member-heading"><h3 class="selected-member-name">${name}</h3><span class="selected-cup-setting">本局已结束</span></div><p class="form-hint">已喝 ${number(member.consumed)} 个 · ${number(member.cups)} 杯 · 剩余待喝 ${number(member.pending)} 个</p>`;
+    return;
+  }
   const cupSize = session.cupSize;
   const insufficient = member.pending < cupSize;
   const limitReached = member.consumed + cupSize > MAX_COUNT;
@@ -295,17 +370,25 @@ function openMember(id) {
 
 function openDialog(name) {
   if (!ready) { toast('请先重新加载记录', { error: true }); return; }
+  if (session.endedAt !== undefined && ['add-member', 'end-session'].includes(name)) { toast('本局已结束，请新开一局', { error: true }); return; }
   if (name === 'add-member') return openAddMembers();
   if (name === 'settings') {
     $('#settings-name').value = session.title;
     $('#settings-step').value = step;
     $('#settings-error').textContent = '';
     $('#settings-dialog').showModal();
+  } else if (name === 'end-session') {
+    if (session.demo) { toast('请先新开一局，开始自己的记录'); return; }
+    const pending = session.members.reduce((total, member) => total + member.pending, 0);
+    $('#end-session-message').textContent = `确认结束「${session.title}」？本局共 ${session.members.length} 位酒友，剩余待喝 ${number(pending)} 个。`;
+    $('#end-session-error').textContent = '';
+    $('#end-session-dialog').showModal();
   } else if (name === 'new-session') {
     $('#new-session-name').value = '今晚的酒局';
     $('#new-session-cup').value = session.cupSize;
     $('#keep-members').checked = !session.demo;
     $('#session-error').textContent = '';
+    $('#new-session-notice').textContent = session.endedAt !== undefined ? '本局已保存到历史，不会重复归档。新局重新计数，添加过的酒友仍可快捷选择。' : '当前酒局会自动保存到「历史酒局」（体验酒局除外）。新局重新计数，添加过的酒友仍可快捷选择。';
     $('#session-dialog').showModal();
   }
 }
@@ -316,6 +399,11 @@ document.addEventListener('click', async event => {
   if (!button || button.disabled) return;
   if (button.dataset.view) switchView(button.dataset.view);
   if (button.dataset.history) openHistory(button.dataset.history);
+  if (button.hasAttribute('data-summary-current') && session.endedAt !== undefined) openSummary(session, session.endedAt);
+  if (button.dataset.summaryHistory) {
+    const entry = ledger.history.find(item => item.id === button.dataset.summaryHistory);
+    if (entry) openSummary(entry.session, entry.endedAt);
+  }
   if (button.hasAttribute('data-retry-storage')) await initialize();
   if (button.hasAttribute('data-toggle-members')) {
     const row = button.closest('.member-draft-row');
@@ -454,6 +542,22 @@ $('#settings-form').addEventListener('submit', async event => {
   } catch (error) { $('#settings-error').textContent = error.message; }
 });
 
+$('#end-session-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (saving) return;
+  const button = $('#end-session-form button[type="submit"]');
+  button.disabled = true;
+  try {
+    const next = finishSession(ledger);
+    if (!await commit(next.session, '本局已结束，最终记录已保存', false, next)) return;
+    snapshots = [];
+    render();
+    $('#end-session-dialog').close();
+    openSummary(session, session.endedAt);
+  } catch (error) { $('#end-session-error').textContent = error.message; }
+  finally { button.disabled = false; }
+});
+
 $('#session-form').addEventListener('submit', async event => {
   event.preventDefault();
   try {
@@ -461,7 +565,7 @@ $('#session-form').addEventListener('submit', async event => {
     if (!title) throw new Error('请输入酒局名称');
     const cupSize = validInteger($('#new-session-cup').value, '每杯数量', 1, 99);
     const next = startNextSession(ledger, { title, cupSize, keepMembers: $('#keep-members').checked });
-    if (!await commit(next.session, '上一局已保存，新一局开始了', false, next)) return;
+    if (!await commit(next.session, session.endedAt !== undefined ? '新一局开始了' : '上一局已保存，新一局开始了', false, next)) return;
     snapshots = [];
     selectedMemberId = null;
     render();
@@ -527,6 +631,8 @@ async function initialize() {
   $('#retry-storage').hidden = true;
   $('#workspace').hidden = true;
   $('#history-panel').hidden = true;
+  $('#finished-session').hidden = true;
+  $('#end-session-button').hidden = true;
   saveStatus('正在加载…');
   try {
     deviceClient ??= createDeviceClient({ storage: localStorage });

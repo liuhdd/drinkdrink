@@ -5,7 +5,7 @@ import { build } from 'esbuild';
 await mkdir('dist/client', { recursive: true });
 await mkdir('dist/server', { recursive: true });
 await mkdir('dist/.openai', { recursive: true });
-for (const file of ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'style.css']) {
+for (const file of ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'summary.mjs', 'style.css']) {
   await cp(`dist/${file}`, `dist/client/${file}`);
 }
 await build({ entryPoints: ['server/worker.mjs'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile: 'dist/server/index.js' });

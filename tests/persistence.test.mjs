@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSession, addMembers, memberAction, demoSession } from '../dist/domain.mjs';
-import { restoreLedger, startNextSession, rememberMembers, availableMembers } from '../dist/persistence.mjs';
+import { restoreLedger, startNextSession, finishSession, rememberMembers, availableMembers } from '../dist/persistence.mjs';
 
 test('旧版本记录迁移后，新开酒局归档全部计数与记录，刷新仍可读取', () => {
   let session = addMembers(createSession({ title: '周五小聚' }), [{ name: '阿杰', pending: 6 }]);
@@ -20,6 +20,42 @@ test('旧版本记录迁移后，新开酒局归档全部计数与记录，刷�
   assert.equal(migrated.history.length, 0);
   assert.equal(old.session.members[0].consumed, 2);
   assert.equal(startNextSession(restoreLedger({ session: demoSession(), step: 1 }), { title: '正式酒局', cupSize: 2 }).history.length, 0);
+});
+
+test('结束本局立即归档且刷新保留结束状态，新开局不重复归档并可保留成员', () => {
+  let session = addMembers(createSession({ title: '今晚小聚' }), [{ name: '阿杰', pending: 6 }]);
+  session = memberAction(session, session.members[0].id, 'drink');
+  const ledger = restoreLedger({ session, step: 3 });
+  const endedAt = session.startedAt + 1000;
+  const finished = finishSession(ledger, endedAt);
+  assert.equal(finished.session.endedAt, endedAt);
+  assert.equal(finished.history.length, 1);
+  assert.equal(finished.history[0].endedAt, endedAt);
+  assert.deepEqual(finished.history[0].session, finished.session);
+  assert.equal(ledger.session.endedAt, undefined);
+  const restored = restoreLedger(JSON.parse(JSON.stringify(finished)));
+  assert.deepEqual(restored, finished);
+  assert.throws(() => finishSession(restored), /已结束/);
+  assert.throws(() => memberAction(restored.session, session.members[0].id, 'add'), /已结束/);
+  assert.throws(() => addMembers(restored.session, [{ name: '小林' }]), /已结束/);
+  const next = startNextSession(restored, { title: '下次再聚', cupSize: 3, keepMembers: true });
+  assert.equal(next.history.length, 1);
+  assert.equal(next.history[0].endedAt, endedAt);
+  assert.equal(next.session.endedAt, undefined);
+  assert.equal(next.session.round, 2);
+  assert.equal(next.session.members[0].id, session.members[0].id);
+  assert.equal(next.session.members[0].consumed, 0);
+  assert.equal(next.session.members[0].pending, 0);
+  assert.equal(next.session.members[0].cupSize, 3);
+});
+
+test('体验局不能结束归档，结束时间必须有效且不能早于开始时间', () => {
+  assert.throws(() => finishSession(restoreLedger({ session: demoSession(), step: 1 })), /体验/);
+  const ledger = restoreLedger({ session: createSession(), step: 1 });
+  for (const endedAt of [NaN, Infinity, '1', ledger.session.startedAt - 1]) {
+    assert.throws(() => finishSession(ledger, endedAt), /结束时间/);
+    assert.throws(() => restoreLedger({ ...ledger, session: { ...ledger.session, endedAt } }));
+  }
 });
 
 test('旧体验酒局中用户自己添加的成员仍迁移，改名不删除另一个已保存身份', () => {

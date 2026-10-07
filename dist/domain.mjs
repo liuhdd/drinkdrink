@@ -24,6 +24,7 @@ export function normalizeSessionCupSize(session) {
 }
 
 export function addMembers(session, drafts, knownMembers = []) {
+  if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   if (!Array.isArray(drafts) || drafts.length === 0) throw new Error('请至少添加一位酒友');
   if (session.members.length + drafts.length > 30) throw new Error('一局最多添加 30 位成员');
   const names = new Set(session.members.map(member => member.name.toLowerCase()));
@@ -56,6 +57,7 @@ export function addMembers(session, drafts, knownMembers = []) {
 }
 
 export function memberAction(session, id, action, quantity = 1) {
+  if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   const member = session.members.find(item => item.id === id);
   if (!member) throw new Error('没有找到这位成员');
   let pending = member.pending;
@@ -100,6 +102,7 @@ export function validateSession(value) {
     validInteger(value.cupSize, '每杯数量', 1, 99);
     validInteger(value.round, '局数', 1, Number.MAX_SAFE_INTEGER);
     if (!Number.isFinite(value.startedAt) || !Number.isFinite(new Date(value.startedAt).getTime()) || typeof value.demo !== 'boolean') return false;
+    if (value.endedAt !== undefined && (value.demo || !Number.isFinite(value.endedAt) || !Number.isFinite(new Date(value.endedAt).getTime()) || value.endedAt < value.startedAt)) return false;
     const ids = new Set();
     for (const member of value.members) {
       if (!member || typeof member.id !== 'string' || !member.id || ids.has(member.id) || typeof member.name !== 'string' || !member.name.trim() || member.name.length > 12) return false;

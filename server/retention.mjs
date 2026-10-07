@@ -10,13 +10,13 @@ export function retainLedger(value, memberSeen = {}, now = Date.now()) {
   ledger.history = ledger.history.filter(entry => entry.endedAt >= cutoff).map(entry => ({
     ...entry, session: { ...entry.session, events: entry.session.events.filter(event => event.at >= cutoff) },
   }));
-  if (ledger.session.startedAt < cutoff) ledger.session = ledger.session.demo ? demoSession() : createSession();
+  if ((ledger.session.endedAt ?? ledger.session.startedAt) < cutoff) ledger.session = ledger.session.demo ? demoSession() : createSession();
   ledger.session = { ...ledger.session, events: ledger.session.events.filter(event => event.at >= cutoff) };
   const seen = Object.fromEntries(ledger.knownMembers.map(member => [member.id, Object.hasOwn(memberSeen, member.id) ? memberSeen[member.id] : now]).filter(([, at]) => at >= cutoff));
   ledger.knownMembers = ledger.knownMembers.filter(member => Object.hasOwn(seen, member.id));
   const dates = [now, ...Object.values(seen), ...ledger.history.map(entry => entry.endedAt),
     ...ledger.history.flatMap(entry => entry.session.events.map(event => event.at)), ...ledger.session.events.map(event => event.at)];
-  dates.push(ledger.session.startedAt);
+  dates.push(ledger.session.endedAt ?? ledger.session.startedAt);
   return { ledger, memberSeen: seen, cleanupAt: Math.min(...dates) + RETENTION_MS };
 }
 

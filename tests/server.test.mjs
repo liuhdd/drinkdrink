@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import worker, { cleanupExpired } from '../server/worker.mjs';
 import { RETENTION_MS, retainLedger } from '../server/retention.mjs';
 import { createSession, addMembers } from '../dist/domain.mjs';
-import { emptyLedger } from '../dist/persistence.mjs';
+import { emptyLedger, finishSession, startNextSession } from '../dist/persistence.mjs';
 import { createDeviceClient, DEVICE_KEY, MIGRATION_KEY } from '../dist/server-storage.mjs';
 import { STORAGE_KEY, LEGACY_STORAGE_KEY } from '../dist/device-storage.mjs';
 
@@ -34,6 +34,47 @@ const memoryStorage = () => {
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
 };
 
+test('结束本局通过服务端保存，重新加载保持最终结果，下一局不重复归档', async t => {
+  const { fetch } = setup(t);
+  const storage = memoryStorage();
+  const client = createDeviceClient({ storage, fetch });
+  const initial = await client.initialize();
+  const active = await client.save(ledgerWithMember(), initial.revision, initial.generation);
+  const finished = finishSession(active.ledger);
+  await client.save(finished, active.revision, active.generation);
+  const refreshed = await createDeviceClient({ storage, fetch }).initialize();
+  assert.deepEqual(refreshed.ledger, finished);
+  const edited = structuredClone(finished);
+  edited.session.members[0].pending++;
+  await assert.rejects(() => client.save(edited, refreshed.revision, refreshed.generation), /已结束/);
+  assert.deepEqual(await client.load(), refreshed);
+  const next = startNextSession(refreshed.ledger, { title: '下次小聚', cupSize: 2, keepMembers: true });
+  const saved = await client.save(next, refreshed.revision, refreshed.generation);
+  assert.equal(saved.ledger.history.length, 1);
+  assert.equal(saved.ledger.history[0].endedAt, finished.session.endedAt);
+  assert.equal(saved.ledger.session.endedAt, undefined);
+  const future = structuredClone(saved);
+  future.ledger.session.endedAt = Date.now() + 60 * 60 * 1000;
+  await assert.rejects(() => client.save(future.ledger, future.revision, future.generation), /格式无效/);
+  assert.deepEqual(await client.load(), saved);
+});
+
+test('已结束酒局按结束时间保留30天，到期后当前结果和归档一起清理', () => {
+  const now = Date.now();
+  const ledger = ledgerWithMember();
+  ledger.session.startedAt = now - RETENTION_MS - 1000;
+  ledger.session.events = [];
+  const finished = finishSession(ledger, now - 1000);
+  assert.deepEqual(retainLedger(finished, {}, now).ledger.session, finished.session);
+  const boundary = retainLedger(finished, {}, finished.session.endedAt + RETENTION_MS).ledger;
+  assert.equal(boundary.session.endedAt, finished.session.endedAt);
+  assert.equal(boundary.history.length, 1);
+  const expired = retainLedger(finished, {}, finished.session.endedAt + RETENTION_MS + 1).ledger;
+  assert.equal(expired.session.endedAt, undefined);
+  assert.equal(expired.session.members.length, 0);
+  assert.equal(expired.history.length, 0);
+});
+
 test('无需登录，设备隔离；读写冲突不会覆盖账本，代际标识阻止已删除账本的旧页面写回', async t => {
   const { request, db } = setup(t);
   const id = crypto.randomUUID(), other = crypto.randomUUID();
@@ -56,6 +97,7 @@ test('无需登录，设备隔离；读写冲突不会覆盖账本，代际标�
 test('定时清理真实删除闲置设备；活跃设备也清理过期酒局、操作与未使用酒友，边界保留', async t => {
   const { request, db, env } = setup(t);
   const now = Date.now(), cutoff = now - RETENTION_MS;
+  t.mock.method(Date, 'now', () => now);
   const id = crypto.randomUUID(), inactive = crypto.randomUUID();
   let ledger = ledgerWithMember();
   const recent = { ...ledger.session, startedAt: cutoff, events: [] };

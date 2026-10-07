@@ -33,7 +33,7 @@ const env = {
   } },
   ASSETS: { async fetch(request) {
     const path = new URL(request.url).pathname;
-    const files = ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'style.css'];
+    const files = ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'summary.mjs', 'style.css'];
     const file = path === '/' ? 'index.html' : path.slice(1);
     if (!files.includes(file)) return new Response('Not found', { status: 404 });
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method not allowed', { status: 405 });
