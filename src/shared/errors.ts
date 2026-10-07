@@ -1,7 +1,7 @@
 import type { ExternalValue, SqlParameter } from './types.ts';
 
 export type ProblemCode = 'VALIDATION' | 'DOMAIN_RULE' | 'NETWORK' | 'HTTP' | 'RESPONSE' | 'CONFLICT' | 'STORAGE' | 'CORRUPT_STORAGE' | 'BROWSER' | 'INTERNAL';
-export interface RequestDetails { method: string; url: string; body: string | null; deviceId: string | null; }
+export interface RequestDetails { method: string; url: string; body: string | null; deviceId: string | null; requestId: string | null; }
 export interface DatabaseDetails { sql: string; parameters: readonly SqlParameter[]; }
 export interface ProblemDetails { operation: string; path: string | null; request: RequestDetails | null; database: DatabaseDetails | null; status: number | null; responseBody: string | null; }
 export type Problem = Error & { code: ProblemCode; details: ProblemDetails };
@@ -29,7 +29,7 @@ export function parseJson(text: string, operation: string): ExternalValue {
 }
 function isRequest(value: ExternalValue): value is RequestDetails {
   if (value === null || typeof value !== 'object') return false;
-  return typeof Reflect.get(value, 'method') === 'string' && typeof Reflect.get(value, 'url') === 'string' && (Reflect.get(value, 'body') === null || typeof Reflect.get(value, 'body') === 'string') && (Reflect.get(value, 'deviceId') === null || typeof Reflect.get(value, 'deviceId') === 'string');
+  return typeof Reflect.get(value, 'method') === 'string' && typeof Reflect.get(value, 'url') === 'string' && (Reflect.get(value, 'body') === null || typeof Reflect.get(value, 'body') === 'string') && (Reflect.get(value, 'requestId') === null || typeof Reflect.get(value, 'requestId') === 'string') && (Reflect.get(value, 'deviceId') === null || typeof Reflect.get(value, 'deviceId') === 'string');
 }
 function isDetails(value: ExternalValue): value is ProblemDetails {
   if (value === null || typeof value !== 'object') return false;

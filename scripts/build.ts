@@ -15,4 +15,4 @@ await writeFile('dist/server/wrangler.json', JSON.stringify({
   assets: { directory: '../client', binding: 'ASSETS', run_worker_first: true },
   triggers: { crons: ['0 * * * *'] },
 }, null, 2) + '\n');
-console.log('Worker、前端和迁移构建完成');
+console.log({ event: 'build_complete', outputs: ['client', 'worker', 'migrations'] });

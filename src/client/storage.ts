@@ -7,7 +7,7 @@ export function browserStorage(storage: StorageAdapter): StorageAdapter {
     try { return execute(); }
     catch (caught) {
       const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
-      throw problem('BROWSER', `浏览器存储 ${operation}(${key}) 失败：${cause.message}`, { ...context(`localStorage.${operation}`, key), request: { method: operation, url: 'browser:localStorage', body: JSON.stringify({ key, value }), deviceId: null } }, cause);
+      throw problem('BROWSER', `浏览器存储 ${operation}(${key}) 失败：${cause.message}`, { ...context(`localStorage.${operation}`, key), request: { method: operation, url: 'browser:localStorage', body: JSON.stringify({ key, value }), deviceId: null, requestId: null } }, cause);
     }
   };
   return {

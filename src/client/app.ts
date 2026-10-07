@@ -1,3 +1,4 @@
+import { failureLog } from '../shared/logging.ts';
 import { domainError, problem, context, isProblem, type Problem } from '../shared/errors.ts';
 import { errorSnapshot } from '../shared/protocol.ts';
 import { objectInput, memberActionInput } from '../shared/validation.ts';
@@ -191,7 +192,7 @@ export async function connectBrowser(): Promise<void> {
   function reportBrowserError(error: Error): void {
     $('#integration-error').hidden = false;
     $('#integration-error').textContent = error.message;
-    console.error(error);
+    console.error(failureLog('browser connector', error));
   }
   window.addEventListener('error', event => { const cause = event.error instanceof Error ? event.error : new Error(event.message, { cause: event.error }); reportBrowserError(cause); });
   window.addEventListener('unhandledrejection', event => { const cause = event.reason instanceof Error ? event.reason : new Error(String(event.reason), { cause: event.reason }); reportBrowserError(cause); });
@@ -394,11 +395,11 @@ export async function connectBrowser(): Promise<void> {
       } catch (caught) {
         const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
         $('#summary-error').textContent = `图片已生成，但分享能力检查失败：${cause.message}`;
-        console.error(problem('BROWSER', cause.message, context('prepare image sharing', null), cause));
+        console.error(failureLog('prepare image sharing', problem('BROWSER', cause.message, context('prepare image sharing', null), cause)));
       }
       $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
     } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
-      console.error(problem('BROWSER', error.message, context('generate summary image', null), error));
+      console.error(failureLog('generate summary image', problem('BROWSER', error.message, context('generate summary image', null), error)));
       if (sequence !== state.summarySequence || !$('#summary-dialog').open) return;
       $('#summary-status').textContent = '图片暂未生成';
       $('#summary-error').textContent = error.message;
@@ -413,7 +414,7 @@ export async function connectBrowser(): Promise<void> {
     const button = $('#summary-share');
     button.disabled = true;
     try { await navigator.share({ files: [state.summaryImage.file], title: `${state.summaryImage.summary.title} · 酒局总结` }); }
-    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#summary-error').textContent = `分享未完成（${error.name}）：${error.message}`; console.error(problem('BROWSER', error.message, context('share image', null), error)); }
+    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#summary-error').textContent = `分享未完成（${error.name}）：${error.message}`; console.error(failureLog('share image', problem('BROWSER', error.message, context('share image', null), error))); }
     finally { button.disabled = false; }
   });
 
@@ -784,7 +785,7 @@ export async function connectBrowser(): Promise<void> {
       toast(data.ledger ? '已同步服务端记录' : '超过 30 天的记录已自动清理', { className: 'toast visible', action: '' });
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
-      console.error(error);
+      console.error(failureLog('browser connector', error));
       if (sequence === state.syncSequence && epoch === state.ledgerEpoch && !state.saving) saveStatus(`同步失败：${error.message}`, 'info');
     }
   }

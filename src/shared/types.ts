@@ -22,7 +22,7 @@ export interface DeviceClient { load(): Promise<Snapshot>; save(ledger: Ledger, 
 export interface MemberSeen { [memberId: string]: number; }
 export interface StoredLedger { ledger: Ledger; memberSeen: MemberSeen; }
 export interface RetainedLedger extends StoredLedger { cleanupAt: number; }
-export interface DatabaseRow { device_id: string; data: string; revision: number; generation: string; updated_at: number; cleanup_at: number; }
+export interface DatabaseRow { device_id: string; data: string; revision: number; generation: string; updated_at: number; cleanup_at: number; last_request_id: string | null; last_request_hash: string | null; }
 export type SqlParameter = string | number | null;
 export interface DatabaseStatement { bind(...params: SqlParameter[]): DatabaseStatement; first(): Promise<ExternalValue>; all(): Promise<{ results: ExternalValue[] }>; run(): Promise<{ meta: { changes: number } }>; }
 export interface LedgerDatabase { prepare(sql: string): DatabaseStatement; }

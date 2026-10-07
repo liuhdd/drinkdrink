@@ -1,0 +1,54 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { applyMigrations, migrationTags, sqliteAdapter } from '../scripts/sqlite.ts';
+import worker from '../src/server/worker.ts';
+import { emptyLedger } from '../src/shared/persistence.ts';
+import { decodeSnapshot } from '../src/shared/protocol.ts';
+import { prepareLedger } from '../src/server/retention.ts';
+import { databaseRow } from '../src/server/records.ts';
+import { requireLedger } from '../src/shared/values.ts';
+import type { WorkerEnv } from '../src/shared/types.ts';
+
+test('真实旧 SQLite 迁移保留账本和旧表，新请求写入幂等元数据且可再次读取', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'drinkdrink-migration-'));
+  const db = new DatabaseSync(join(directory, 'ledger.sqlite'));
+  t.after(() => { db.close(); rmSync(directory, { recursive: true, force: true }); });
+  db.exec('CREATE TABLE local_migrations (tag TEXT PRIMARY KEY)');
+  for (const tag of migrationTags().slice(0, 2)) {
+    db.exec(readFileSync(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8'));
+    db.prepare('INSERT INTO local_migrations (tag) VALUES (?)').run(tag);
+  }
+  db.prepare('INSERT INTO ledgers (user_id, data, revision) VALUES (?, ?, ?)').run('preserved-user', '{}', 7);
+  const now = Date.now(), device = crypto.randomUUID(), generation = crypto.randomUUID();
+  const prepared = prepareLedger(emptyLedger(now), null, now);
+  const encoded = JSON.stringify({ ledger: prepared.ledger, memberSeen: prepared.memberSeen });
+  db.prepare('INSERT INTO device_ledgers (device_id, data, revision, generation, updated_at, cleanup_at) VALUES (?, ?, ?, ?, ?, ?)').run(device, encoded, 2, generation, now, prepared.cleanupAt);
+  const before = db.prepare('SELECT data, revision, generation, updated_at, cleanup_at FROM device_ledgers').get();
+  applyMigrations(db);
+  assert.deepEqual(db.prepare('SELECT data, revision, generation, updated_at, cleanup_at FROM device_ledgers').get(), before);
+  const row = databaseRow(db.prepare('SELECT * FROM device_ledgers').get());
+  assert.equal(row.last_request_id, null);
+  assert.equal(row.last_request_hash, null);
+  assert.equal(db.prepare('SELECT revision FROM ledgers WHERE user_id = ?').get('preserved-user')?.revision, 7);
+  const env: WorkerEnv = { DB: sqliteAdapter(db), ASSETS: { fetch: () => new Response('asset') } };
+  const url = 'http://127.0.0.1/api/ledger';
+  const headers = { 'X-Device-ID': device, Origin: 'http://127.0.0.1', 'Content-Type': 'application/json' };
+  const response = await worker.fetch(new Request(url, { headers }), env);
+  assert.equal(response.status, 200);
+  const loaded = decodeSnapshot(await response.json());
+  assert.deepEqual(requireLedger(loaded), prepared.ledger);
+  const requestId = crypto.randomUUID();
+  const body = JSON.stringify({ ledger: { ...requireLedger(loaded), step: 2 }, revision: loaded.revision, generation: loaded.generation });
+  const savedResponse = await worker.fetch(new Request(url, { method: 'PUT', headers: { ...headers, 'X-Request-ID': requestId }, body }), env);
+  assert.equal(savedResponse.status, 200);
+  const saved = decodeSnapshot(await savedResponse.json());
+  const after = databaseRow(db.prepare('SELECT * FROM device_ledgers').get());
+  assert.equal(after.last_request_id, requestId);
+  assert.match(String(after.last_request_hash), /^[a-f0-9]{64}$/);
+  const refreshed = await worker.fetch(new Request(url, { headers }), env);
+  assert.deepEqual(decodeSnapshot(await refreshed.json()), saved);
+});

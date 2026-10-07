@@ -14,4 +14,6 @@ export const deviceLedgers = sqliteTable('device_ledgers', {
   generation: text('generation').notNull(),
   updatedAt: integer('updated_at').notNull(),
   cleanupAt: integer('cleanup_at').notNull(),
+  lastRequestId: text('last_request_id'),
+  lastRequestHash: text('last_request_hash'),
 }, table => [index('device_ledgers_updated_at_idx').on(table.updatedAt), index('device_ledgers_cleanup_at_idx').on(table.cleanupAt)]);

@@ -1,4 +1,5 @@
 import type { LedgerDatabase, DatabaseStatement, SqlParameter } from '../shared/types.ts';
+import { retryOperation, retryableDatabaseError } from '../shared/retry.ts';
 import { context, problem } from '../shared/errors.ts';
 
 // 在数据库接口边界保留 SQL、参数和原始失败原因。 Preserve SQL, parameters and the original cause at the database interface.
@@ -16,7 +17,7 @@ export function diagnosticDatabase(database: LedgerDatabase): LedgerDatabase {
         bind: (...parameters: SqlParameter[]) => bound(parameters),
         first: () => invoke('first', () => database.prepare(sql).bind(...parameters).first()),
         all: () => invoke('all', () => database.prepare(sql).bind(...parameters).all()),
-        run: () => invoke('run', () => database.prepare(sql).bind(...parameters).run()),
+        run: () => retryOperation('database.run', () => invoke('run', () => database.prepare(sql).bind(...parameters).run()), retryableDatabaseError),
       };
     };
     return bound([]);
