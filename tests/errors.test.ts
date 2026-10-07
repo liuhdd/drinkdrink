@@ -1,3 +1,4 @@
+import { successful } from './http-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ledgerServer } from './http-fixture.ts';
@@ -28,8 +29,8 @@ test('真实 HTTP 校验错误包含字段路径、请求内容和状态；数�
 test('真实断连和 API 错误在客户端保留请求、响应及异常原因', async t => {
   const service = await ledgerServer(t);
   const client = createDeviceClient({ storage: service.storage, fetch: service.request, randomUUID: () => crypto.randomUUID() });
-  const initial = await client.initialize();
-  await assert.rejects(() => client.save({ ...emptyLedger(Date.now()), session: { ...emptyLedger(Date.now()).session, startedAt: Date.now() + 3_600_000 } }, initial.revision, initial.generation), error => {
+  const initial = await successful(client.initialize());
+  await assert.rejects(() => successful(client.save({ ...emptyLedger(Date.now()), session: { ...emptyLedger(Date.now()).session, startedAt: Date.now() + 3_600_000 } }, initial.revision, initial.generation)), error => {
     assert.ok(error instanceof Error && isProblem(error));
     assert.equal(error.details.status, 400);
     assert.ok(error.details.request?.body);
@@ -49,7 +50,7 @@ test('真实断连和 API 错误在客户端保留请求、响应及异常原因
 test('真实 SQLite 损坏的版本元数据归为服务端存储损坏，不归咎请求参数', async t => {
   const service = await ledgerServer(t);
   const client = createDeviceClient({ storage: service.storage, fetch: service.request, randomUUID: () => crypto.randomUUID() });
-  await client.initialize();
+  await successful(client.initialize());
   service.db.prepare('UPDATE device_ledgers SET revision = 0 WHERE device_id = ?').run(service.storage.getItem(DEVICE_KEY));
   await assert.rejects(client.load(), error => {
     assert.ok(error instanceof Error && isProblem(error));

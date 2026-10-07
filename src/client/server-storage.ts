@@ -1,21 +1,23 @@
-import { decodeSnapshot, errorSnapshot } from '../shared/protocol.ts';
-import type { ExternalValue, DeviceOptions, DeviceClient, Snapshot, Ledger, SaveRequest } from '../shared/types.ts';
+import { decodeSnapshot } from '../shared/protocol.ts';
+import type { ExternalValue, DeviceOptions, DeviceClient, Snapshot, Ledger, SaveRequest, ClientResult } from '../shared/types.ts';
 import { field } from '../shared/values.ts';
-import { context, problem, parseJson, isProblemCode } from '../shared/errors.ts';
+import { context, problem, parseJson, isProblemCode, isProblem } from '../shared/errors.ts';
+import { uuidInput } from '../shared/validation.ts';
+import { browserStorage } from './storage.ts';
 import { emptyLedger, restoreLedger } from '../shared/persistence.ts';
 import { loadDeviceLedger, STORAGE_KEY, LEGACY_STORAGE_KEY } from './device-storage.ts';
 
 export const DEVICE_KEY = 'cheers-device-id-v1';
 export const MIGRATION_KEY = 'cheers-server-migrated-v1';
 export const SYNC_KEY = 'cheers-server-sync-v1';
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createDeviceClient({ storage, fetch: request, randomUUID }: DeviceOptions): DeviceClient {
+export function createDeviceClient({ storage: suppliedStorage, fetch: request, randomUUID }: DeviceOptions): DeviceClient {
+  const storage = browserStorage(suppliedStorage);
   let deviceId: string | undefined;
   const identify = (): string => {
     if (deviceId) return deviceId;
     const storedId = storage.getItem(DEVICE_KEY);
-    const nextId = storedId !== null && uuid.test(storedId) ? storedId : randomUUID();
+    const nextId = storedId === null ? randomUUID() : uuidInput(storedId, DEVICE_KEY);
     if (nextId !== storedId) storage.setItem(DEVICE_KEY, nextId);
     deviceId = nextId;
     return deviceId;
@@ -71,27 +73,38 @@ export function createDeviceClient({ storage, fetch: request, randomUUID }: Devi
     }
   };
   const finishMigration = (): void => {
-    // 本地清理失败不能将成功的服务端保存报告为失败。 A successful server write must not be reported as failed if local housekeeping fails.
-    try { storage.setItem(MIGRATION_KEY, identify()); storage.removeItem(STORAGE_KEY); storage.removeItem(LEGACY_STORAGE_KEY); }
-    catch { /* 浏览器存储只读时保留本地备份。 Keep a local backup when browser storage is read-only. */ }
+    storage.setItem(MIGRATION_KEY, identify());
+    storage.removeItem(STORAGE_KEY);
+    storage.removeItem(LEGACY_STORAGE_KEY);
   };
-  const save = async (ledger: Ledger, revision: number, generation: string | null): Promise<Snapshot> => {
+  const localResult = (snapshot: Snapshot, execute: () => void): ClientResult => {
+    try { execute(); return { snapshot, localError: null }; }
+    catch (caught) {
+      const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+      const details = isProblem(cause) ? cause.details : context('local maintenance', null);
+      return { snapshot, localError: problem('BROWSER', `账本已在服务端保存，但本地维护失败：${cause.message}。请修复存储权限后重试本地维护。`, details, cause) };
+    }
+  };
+  const maintainSavedLedger = (): void => { finishMigration(); storage.setItem(SYNC_KEY, randomUUID()); };
+  const save = async (ledger: Ledger, revision: number, generation: string | null): Promise<ClientResult> => {
     const data = await call('PUT', { ledger: restoreLedger(ledger), revision, generation });
-    finishMigration();
-    try { storage.setItem(SYNC_KEY, randomUUID()); } catch { /* 重新聚焦时的同步也会检查服务端。 Focus synchronization also checks the server. */ }
-    return data;
+    return localResult(data, maintainSavedLedger);
   };
   return {
     load: () => call('GET', undefined), save,
     async initialize() {
-      let data = await call('GET', undefined);
+      const data = await call('GET', undefined);
       if (!data.ledger) {
         const initial = storage.getItem(MIGRATION_KEY) === identify() ? emptyLedger(Date.now()) : loadDeviceLedger(storage).ledger;
-        try { data = await save(initial, 0, null); }
-        catch (error) { const conflict = error instanceof Error ? errorSnapshot(error) : null; if (!conflict?.ledger) throw error; data = conflict; }
+        return save(initial, 0, null);
       }
-      finishMigration();
-      return data;
+      return localResult(data, finishMigration);
+    },
+    async repairLocalStorage() {
+      const snapshot = await call('GET', undefined);
+      if (snapshot.ledger === null) throw problem('BROWSER', '服务端记录已清理，请重新加载页面；本地备份未删除', context('repair local storage', null), undefined);
+      maintainSavedLedger();
+      return snapshot;
     },
   };
 }

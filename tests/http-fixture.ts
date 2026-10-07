@@ -54,3 +54,9 @@ export async function ledgerServer(t: TestContext) {
   t.after(async () => { if (listening) await stop(); if (databaseOpen) closeDatabase(); rmSync(directory, { recursive: true, force: true }); });
   return { origin, request, storage, storagePath, db, databasePath, closeDatabase, stop };
 }
+
+export async function successful(result: Promise<import('../src/shared/types.ts').ClientResult>) {
+  const value = await result;
+  if (value.localError !== null) throw value.localError;
+  return value.snapshot;
+}

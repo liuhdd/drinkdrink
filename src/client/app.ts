@@ -1,4 +1,4 @@
-import { domainError } from '../shared/errors.ts';
+import { domainError, problem, context, isProblem, type Problem } from '../shared/errors.ts';
 import { errorSnapshot } from '../shared/protocol.ts';
 import { objectInput, memberActionInput } from '../shared/validation.ts';
 import { draftIdentity } from './actions.ts';
@@ -12,6 +12,7 @@ import { createDeviceClient, SYNC_KEY } from './server-storage.ts';
 import { createSummaryImage } from './summary.ts';
 
 interface BrowserState {
+  localError: Problem | null;
   ledger: Ledger;
   session: Session;
   step: number;
@@ -38,6 +39,7 @@ interface BrowserState {
 export async function connectBrowser(): Promise<void> {
   const initialLedger = emptyLedger(Date.now());
   const state: BrowserState = {
+    localError: null,
     ledger: initialLedger,
     session: initialLedger.session,
     step: 1,
@@ -81,8 +83,14 @@ export async function connectBrowser(): Promise<void> {
     sparkles: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4m-2-2h4"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/>',
   };
-  const icon = (name: string | undefined): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${Object.entries(paths).find(([key]) => key === name)?.[1] || ''}</svg>`;
+  const icon = (name: string | undefined): string => {
+    const path = Object.entries(paths).find(([key]) => key === name);
+    if (!path) throw domainError(`图标名称无效：${name}`, 'render icon');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path[1]}</svg>`;
+  };
   const elements = {
+    '#integration-error': element(document, '#integration-error', HTMLElement),
+    '#retry-local-storage': element(document, '#retry-local-storage', HTMLButtonElement),
     '#activity-list': element(document, '#activity-list', HTMLElement),
     '#add-members-dialog': element(document, '#add-members-dialog', HTMLDialogElement),
     '#add-members-error': element(document, '#add-members-error', HTMLElement),
@@ -168,8 +176,8 @@ export async function connectBrowser(): Promise<void> {
     { bg: '#eee7d6', fg: '#786b48', name: '沙金' },
     { bg: '#efdde1', fg: '#885966', name: '烟粉' },
   ];
-  const colorStyle = (color: number): string => `--avatar-bg:${colors[color]?.bg || at(colors, 0).bg};--avatar-fg:${colors[color]?.fg || at(colors, 0).fg}`;
-  const avatar = (member: Pick<Profile, 'name' | 'color'>, extra: string): string => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
+  const colorStyle = (color: number): string => `--avatar-bg:${at(colors, color).bg};--avatar-fg:${at(colors, color).fg}`;
+  const avatar = (member: Pick<Profile, 'name' | 'color'>, extra: string): string => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML(at([...member.name], 0))}</span>`;
   const number = (value: number): string => Number(value).toLocaleString('zh-CN');
 
   function hydrateIcons(root: ParentNode) {
@@ -179,6 +187,34 @@ export async function connectBrowser(): Promise<void> {
   function saveStatus(text: string, iconName: string) {
     $('#save-status').innerHTML = `${icon(iconName)}<span>${escapeHTML(text)}</span>`;
   }
+
+  function reportBrowserError(error: Error): void {
+    $('#integration-error').hidden = false;
+    $('#integration-error').textContent = error.message;
+    console.error(error);
+  }
+  window.addEventListener('error', event => { const cause = event.error instanceof Error ? event.error : new Error(event.message, { cause: event.error }); reportBrowserError(cause); });
+  window.addEventListener('unhandledrejection', event => { const cause = event.reason instanceof Error ? event.reason : new Error(String(event.reason), { cause: event.reason }); reportBrowserError(cause); });
+  $('#retry-local-storage').addEventListener('click', async () => {
+    if (!state.ready || state.saving) { toast('请等待当前保存或加载完成后重试本地维护', { className: 'toast visible error', action: '' }); return; }
+    state.saving = true;
+    const button = $('#retry-local-storage');
+    button.disabled = true;
+    try {
+      if (!state.deviceClient) throw domainError('记录客户端尚未初始化', 'repair local storage');
+      const data = await state.deviceClient.repairLocalStorage();
+      if (data.revision !== state.revision || data.generation !== state.generation) state.snapshots = [];
+      applyLedger(requireLedger(data), data.revision, data.generation);
+      state.localError = null;
+      button.hidden = true;
+      render();
+      saveStatus('服务端记录与本地标记均已保存', 'cloud-check');
+    } catch (caught) {
+      const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+      saveStatus(`本地维护失败：${cause.message}`, 'info');
+      toast(cause.message, { className: 'toast visible error', action: '' });
+    } finally { state.saving = false; button.disabled = false; }
+  });
 
   function applyLedger(value: Ledger, nextRevision: number, nextGeneration: string | null) {
     state.ledgerEpoch++;
@@ -219,18 +255,22 @@ export async function connectBrowser(): Promise<void> {
     state.saving = true;
     saveStatus('正在保存…', 'cloud-check');
     try {
-      const data = await saveToServer(next, state.revision);
+      const result = await saveToServer(next, state.revision);
+      const data = result.snapshot;
       applyLedger(requireLedger(data), data.revision, data.generation);
+      state.localError = result.localError;
     } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       saveStatus('未保存 · 请重试', 'info');
       const formError = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)?.querySelector('.form-error');
-      if (formError) formError.textContent = error.message || '保存失败，请重试';
-      toast(error.message || '保存失败，请重试', { className: 'toast visible error', action: '' });
+      if (formError) formError.textContent = error.message;
+      toast(error.message, { className: 'toast visible error', action: '' });
       return false;
     } finally { state.saving = false; }
-    saveStatus('服务端已自动保存', 'cloud-check');
+    $('#retry-local-storage').hidden = state.localError === null;
+    saveStatus(state.localError?.message ?? '服务端已自动保存', state.localError ? 'info' : 'cloud-check');
     render();
-    if (message) toast(message, { className: 'toast visible', action: '' });
+    if (state.localError) toast(state.localError.message, { className: 'toast visible error', action: '' });
+    else if (message) toast(message, { className: 'toast visible', action: '' });
     return true;
   }
 
@@ -239,7 +279,7 @@ export async function connectBrowser(): Promise<void> {
     if (!await commitLedger(nextSession, '', changes)) return false;
     state.snapshots = [...state.snapshots, structuredClone(previous)].slice(-30);
     render();
-    toast(message, { className: 'toast visible', action: '<button type="button" data-undo>撤销</button>' });
+    toast(state.localError?.message ?? message, { className: state.localError ? 'toast visible error' : 'toast visible', action: '<button type="button" data-undo>撤销</button>' });
     return true;
   }
 
@@ -351,12 +391,17 @@ export async function connectBrowser(): Promise<void> {
       try {
         state.summaryImage.file = new File([result.blob], result.filename, { type: 'image/png' });
         $('#summary-share').hidden = !navigator.share || !navigator.canShare?.({ files: [state.summaryImage.file] });
-      } catch { /* 仍可下载或长按保存图片。 Download and long-press saving remain available. */ }
+      } catch (caught) {
+        const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+        $('#summary-error').textContent = `图片已生成，但分享能力检查失败：${cause.message}`;
+        console.error(problem('BROWSER', cause.message, context('prepare image sharing', null), cause));
+      }
       $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
     } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+      console.error(problem('BROWSER', error.message, context('generate summary image', null), error));
       if (sequence !== state.summarySequence || !$('#summary-dialog').open) return;
       $('#summary-status').textContent = '图片暂未生成';
-      $('#summary-error').textContent = error.message || '图片生成失败，请重试';
+      $('#summary-error').textContent = error.message;
       $('#summary-retry').hidden = false;
     }
   }
@@ -368,7 +413,7 @@ export async function connectBrowser(): Promise<void> {
     const button = $('#summary-share');
     button.disabled = true;
     try { await navigator.share({ files: [state.summaryImage.file], title: `${state.summaryImage.summary.title} · 酒局总结` }); }
-    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
+    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#summary-error').textContent = `分享未完成（${error.name}）：${error.message}`; console.error(problem('BROWSER', error.message, context('share image', null), error)); }
     finally { button.disabled = false; }
   });
 
@@ -730,14 +775,18 @@ export async function connectBrowser(): Promise<void> {
       if (!state.deviceClient) throw domainError('记录客户端尚未初始化', 'app');
       const data = await state.deviceClient.load();
       if (sequence !== state.syncSequence || epoch !== state.ledgerEpoch || state.saving || document.querySelector('dialog[open]')) return;
-      if (data.revision === state.revision && data.generation === state.generation) { saveStatus('服务端已自动保存', 'cloud-check'); return; }
+      if (data.revision === state.revision && data.generation === state.generation) { saveStatus(state.localError?.message ?? '服务端已自动保存', state.localError ? 'info' : 'cloud-check'); return; }
       if (data.generation === state.generation && data.revision < state.revision) return;
       applyLedger(data.ledger ?? emptyLedger(Date.now()), data.revision, data.generation);
       state.snapshots = [];
       render();
-      saveStatus(data.ledger ? '服务端已自动保存' : '旧数据已自动清理', 'cloud-check');
+      saveStatus(state.localError?.message ?? (data.ledger ? '服务端已自动保存' : '旧数据已自动清理'), state.localError ? 'info' : 'cloud-check');
       toast(data.ledger ? '已同步服务端记录' : '超过 30 天的记录已自动清理', { className: 'toast visible', action: '' });
-    } catch { if (sequence === state.syncSequence && epoch === state.ledgerEpoch && !state.saving) saveStatus('服务端暂时无法连接', 'info'); }
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+      console.error(error);
+      if (sequence === state.syncSequence && epoch === state.ledgerEpoch && !state.saving) saveStatus(`同步失败：${error.message}`, 'info');
+    }
   }
 
   window.addEventListener('storage', event => {
@@ -763,17 +812,20 @@ export async function connectBrowser(): Promise<void> {
       state.deviceClient ??= createDeviceClient({ storage: localStorage, fetch: globalThis.fetch, randomUUID: () => crypto.randomUUID() });
       const client = state.deviceClient;
       const load = () => client.initialize();
-      const data = navigator.locks?.request ? await navigator.locks.request('cheers-device-initialize', load) : await load();
+      const result = navigator.locks?.request ? await navigator.locks.request('cheers-device-initialize', load) : await load();
+      const data = result.snapshot;
+      state.localError = result.localError;
+      $('#retry-local-storage').hidden = state.localError === null;
       applyLedger(requireLedger(data), data.revision, data.generation);
       state.ready = true;
       state.snapshots = [];
       render();
       switchView(state.view);
       $('#load-notice').hidden = true;
-      saveStatus('服务端已自动保存', 'cloud-check');
+      saveStatus(state.localError?.message ?? '服务端已自动保存', state.localError ? 'info' : 'cloud-check');
     } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       state.ready = false;
-      $('#load-message').textContent = error.message || '记录无法加载，请检查网络和浏览器存储权限后重试';
+      $('#load-message').textContent = error.message;
       $('#retry-storage').hidden = false;
       saveStatus('记录未加载', 'info');
     }
@@ -790,10 +842,14 @@ export async function connectBrowser(): Promise<void> {
   // 按能力检测注册 WebMCP 工具，与页面共用记账操作。 Feature-detected WebMCP tools share the exact accounting actions used by the UI.
   if (modelContext?.registerTool) {
     const lifecycle = new AbortController();
-    const register = (tool: Tool) => {
-      try { Promise.resolve(modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* 提议中的 API 不受支持时，页面仍可使用。 The UI remains available if the proposed API is unsupported. */ }
+    const register = async (tool: Tool): Promise<void> => {
+      try { await modelContext.registerTool(tool, { signal: lifecycle.signal }); }
+      catch (caught) {
+        const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+        throw problem('BROWSER', `自动操作功能注册失败（${tool.name}）：${cause.message}`, context('register browser tool', tool.name), cause);
+      }
     };
-    register({
+    await register({
       name: 'read_current_drinking_session', title: '读取本局记账',
       description: 'Read the current session, per-member pending counts, consumed counts, cup sizes and leaderboard. No state changes.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: true },
@@ -804,7 +860,7 @@ export async function connectBrowser(): Promise<void> {
         return { title: state.session.title, round: state.session.round, demo: state.session.demo, cupSize: state.session.cupSize, members: structuredClone(state.session.members), leaderboard: leaderboard(state.session) };
       },
     });
-    register({
+    await register({
       name: 'record_member_drinking_action', title: '为成员记酒',
       description: 'Add or subtract pending drink units for one existing member, or complete one cup using the current round’s shared cup size. Changes the visible ledger and current-round leaderboard; supports UI undo.',
       inputSchema: { type: 'object', properties: { memberId: { type: 'string' }, action: { type: 'string', enum: ['add', 'subtract', 'drink'] }, quantity: { type: 'integer', minimum: 1, maximum: 99 } }, required: ['memberId', 'action'], additionalProperties: true },

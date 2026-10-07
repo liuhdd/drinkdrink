@@ -1,3 +1,4 @@
+import type { Problem } from './errors.ts';
 export type ExternalValue = object | string | number | boolean | bigint | symbol | null | undefined;
 export type Action = 'add' | 'subtract' | 'drink' | 'set';
 export interface Profile { id: string; name: string; color: number; }
@@ -17,7 +18,7 @@ export interface StorageAdapter { getItem(key: string): string | null; setItem(k
 export type LegacyStorage = Pick<StorageAdapter, 'getItem' | 'setItem'>;
 export type FetchAdapter = (path: string, options: RequestInit) => Promise<Response>;
 export interface DeviceOptions { storage: StorageAdapter; fetch: FetchAdapter; randomUUID: () => string; }
-export interface DeviceClient { load(): Promise<Snapshot>; save(ledger: Ledger, revision: number, generation: string | null): Promise<Snapshot>; initialize(): Promise<Snapshot>; }
+export interface DeviceClient { load(): Promise<Snapshot>; save(ledger: Ledger, revision: number, generation: string | null): Promise<ClientResult>; initialize(): Promise<ClientResult>; repairLocalStorage(): Promise<Snapshot>; }
 export interface MemberSeen { [memberId: string]: number; }
 export interface StoredLedger { ledger: Ledger; memberSeen: MemberSeen; }
 export interface RetainedLedger extends StoredLedger { cleanupAt: number; }
@@ -30,3 +31,5 @@ export interface Summary { title: string; round: number; cupSize: number; starte
 export interface SummaryImage { blob: Blob; filename: string; summary: Summary; }
 export interface EventIdentity { id: string; at: number; }
 export interface DraftIdentity { memberIds: readonly string[]; eventIds: readonly string[]; at: number; }
+
+export interface ClientResult { snapshot: Snapshot; localError: Problem | null; }

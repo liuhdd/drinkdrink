@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, extname } from 'node:path';
 import { context } from 'esbuild';
+import { context as errorContext, errorBody, isProblem, problem } from '../src/shared/errors.ts';
 import worker, { cleanupExpired } from '../src/server/worker.ts';
 import type { WorkerEnv } from '../src/shared/types.ts';
 import { buildClient, clientBuildOptions } from './client.ts';
@@ -44,10 +45,16 @@ const server = createServer(async (incoming, outgoing) => {
     const response = await worker.fetch(request, env);
     outgoing.writeHead(response.status, Object.fromEntries(response.headers));
     outgoing.end(Buffer.from(await response.arrayBuffer()));
-  } catch (error) { console.error(error); outgoing.writeHead(500); outgoing.end('Local server error'); }
+  } catch (caught) {
+    const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+    const failure = isProblem(cause) ? cause : problem('INTERNAL', `本地 HTTP 请求失败：${cause.message}`, { ...errorContext('local HTTP request', null), request: { method: incoming.method ?? 'GET', url: incoming.url ?? '/', body: null, deviceId: incoming.headers['x-device-id']?.toString() ?? null }, status: 500 }, cause);
+    console.error(failure);
+    outgoing.writeHead(500, { 'Content-Type': 'application/json' });
+    outgoing.end(JSON.stringify(errorBody(failure)));
+  }
 });
 server.listen(port, '127.0.0.1', () => console.log(`本地预览：http://127.0.0.1:${port}`));
 await cleanupExpired(env.DB, Date.now());
-const cleanupTimer = setInterval(() => cleanupExpired(env.DB, Date.now()).catch(console.error), 60 * 60 * 1000);
+const cleanupTimer = setInterval(() => cleanupExpired(env.DB, Date.now()).catch(error => { clearInterval(cleanupTimer); throw error; }), 60 * 60 * 1000);
 cleanupTimer.unref();
 process.once('SIGTERM', () => { clearInterval(cleanupTimer); server.close(() => { db.close(); void builder.dispose(); }); });

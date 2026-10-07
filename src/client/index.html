@@ -17,6 +17,7 @@
       <button class="settings-button" data-open="settings" aria-label="酒局设置"><span data-icon="settings"></span><span>酒局设置</span></button>
     </header>
     <main class="page">
+      <p id="integration-error" class="form-error" role="alert" hidden></p>
       <section class="page-heading">
         <div><div class="eyebrow"><span class="live-dot"></span> TONIGHT'S SESSION <span id="demo-badge" class="demo-badge">体验酒局</span></div><h1>今晚，喝个明白<span class="lime">。</span></h1><div class="session-meta"><span id="session-title">周末小聚</span><span class="meta-divider"></span><span id="session-round">第 01 局</span><span class="meta-divider"></span><span id="session-date"></span></div></div>
         <button id="end-session-button" class="button secondary" data-open="end-session" hidden><span data-icon="check-circle"></span>结束本局</button>
@@ -39,7 +40,7 @@
         </aside>
       </div>
       <section id="history-panel" class="history-panel" aria-label="历史酒局" hidden><div class="section-heading"><h2>历史酒局 <span id="history-count" class="count-badge">0</span></h2><button class="button secondary" data-open="new-session"><span data-icon="plus"></span>新开一局</button></div><div id="history-list" class="history-list"></div><p class="form-hint">历史酒局保留结束时的成员、计数、排行和最近 80 条操作记录，超过 30 天自动删除。</p></section>
-      <footer class="page-footer"><span class="footer-brand">按设备保存 <span>·</span> 记录保留 30 天</span><span id="save-status"><span data-icon="cloud-check"></span>正在加载…</span></footer>
+      <footer class="page-footer"><span class="footer-brand">按设备保存 <span>·</span> 记录保留 30 天</span><span id="save-status"><span data-icon="cloud-check"></span>正在加载…</span><button id="retry-local-storage" class="text-button" type="button" hidden>重试本地维护</button></footer>
     </main>
     <nav class="mobile-nav" aria-label="移动导航"><button data-view="ledger" class="active"><span data-icon="grid"></span>记账</button><button data-view="ranking"><span data-icon="trophy"></span>排行</button><button data-view="history"><span data-icon="history"></span>历史</button><button data-open="settings"><span data-icon="settings"></span>设置</button></nav>
     <dialog id="add-members-dialog" aria-labelledby="add-members-title">
