@@ -1,3 +1,4 @@
+import { domainError } from '../shared/errors.ts';
 import { errorSnapshot } from '../shared/protocol.ts';
 import { objectInput, memberActionInput } from '../shared/validation.ts';
 import { draftIdentity } from './actions.ts';
@@ -190,9 +191,9 @@ export async function connectBrowser(): Promise<void> {
 
   async function saveToServer(value: Ledger, expectedRevision: number) {
     try {
-      if (!state.deviceClient) throw new Error('记录客户端尚未初始化');
+      if (!state.deviceClient) throw domainError('记录客户端尚未初始化', 'app');
       return await state.deviceClient.save(value, expectedRevision, state.generation);
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       const conflict = error instanceof Error ? errorSnapshot(error) : null;
       if (conflict) {
         applyLedger(conflict.ledger ?? emptyLedger(Date.now()), conflict.revision, conflict.generation);
@@ -220,7 +221,7 @@ export async function connectBrowser(): Promise<void> {
     try {
       const data = await saveToServer(next, state.revision);
       applyLedger(requireLedger(data), data.revision, data.generation);
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       saveStatus('未保存 · 请重试', 'info');
       const formError = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)?.querySelector('.form-error');
       if (formError) formError.textContent = error.message || '保存失败，请重试';
@@ -352,7 +353,7 @@ export async function connectBrowser(): Promise<void> {
         $('#summary-share').hidden = !navigator.share || !navigator.canShare?.({ files: [state.summaryImage.file] });
       } catch { /* 仍可下载或长按保存图片。 Download and long-press saving remain available. */ }
       $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       if (sequence !== state.summarySequence || !$('#summary-dialog').open) return;
       $('#summary-status').textContent = '图片暂未生成';
       $('#summary-error').textContent = error.message || '图片生成失败，请重试';
@@ -367,7 +368,7 @@ export async function connectBrowser(): Promise<void> {
     const button = $('#summary-share');
     button.disabled = true;
     try { await navigator.share({ files: [state.summaryImage.file], title: `${state.summaryImage.summary.title} · 酒局总结` }); }
-    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
+    catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
     finally { button.disabled = false; }
   });
 
@@ -564,12 +565,12 @@ export async function connectBrowser(): Promise<void> {
         const id = button.dataset.id;
         if (!id) throw new TypeError('成员按钮缺少 ID');
         const member = state.session.members.find(item => item.id === id);
-        if (!member) throw new Error('没有找到这位成员');
+        if (!member) throw domainError('没有找到这位成员', 'app');
         const next = memberAction(state.session, id, button.dataset.action, state.step, { id: crypto.randomUUID(), at: Date.now() });
         const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${state.session.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${state.step} 个`;
         await commitMember(next, message, {});
         $('#member-controls').querySelector<HTMLButtonElement>(`[data-id="${CSS.escape(id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
-      } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); toast(error.message, { className: 'toast visible error', action: '' }); }
+      } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); toast(error.message, { className: 'toast visible error', action: '' }); }
     }
   });
 
@@ -629,19 +630,19 @@ export async function connectBrowser(): Promise<void> {
       render();
       $('#add-members-dialog').close();
       switchView('ledger');
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#add-members-error').textContent = error.message; }
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#add-members-error').textContent = error.message; }
   });
 
   $('#member-form').addEventListener('submit', async event => {
     event.preventDefault();
     try {
       const name = $('#member-name').value.trim();
-      if (!name) throw new Error('请输入成员昵称');
-      if (state.session.members.some(member => member.id !== state.editId && member.name.toLowerCase() === name.toLowerCase())) throw new Error('已有同名成员，请使用不同昵称');
-      if (state.ledger.knownMembers.some(member => member.id !== state.editId && member.name.toLowerCase() === name.toLowerCase())) throw new Error('以前的酒友中已有此昵称，请使用不同昵称');
+      if (!name) throw domainError('请输入成员昵称', 'app');
+      if (state.session.members.some(member => member.id !== state.editId && member.name.toLowerCase() === name.toLowerCase())) throw domainError('已有同名成员，请使用不同昵称', 'app');
+      if (state.ledger.knownMembers.some(member => member.id !== state.editId && member.name.toLowerCase() === name.toLowerCase())) throw domainError('以前的酒友中已有此昵称，请使用不同昵称', 'app');
       const pending = validInteger($('#member-pending').value, '待喝数量', 0, 9999);
       const old = state.session.members.find(member => member.id === state.editId);
-      if (!old) throw new Error('没有找到这位成员');
+      if (!old) throw domainError('没有找到这位成员', 'app');
       const member = { ...old, name, color: state.selectedColor, pending, cupSize: state.session.cupSize };
       const next = { ...state.session, members: state.session.members.map(item => item.id === state.editId ? member : item) };
       state.selectedMemberId = member.id;
@@ -649,19 +650,19 @@ export async function connectBrowser(): Promise<void> {
       if (!await commitMember(next, `已更新${name}`, { knownMembers: rememberMembers(state.ledger.knownMembers, [member]) })) return;
       $('#member-dialog').close();
       switchView('ledger');
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#member-error').textContent = error.message; }
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#member-error').textContent = error.message; }
   });
 
   $('#settings-form').addEventListener('submit', async event => {
     event.preventDefault();
     try {
       const title = $('#settings-name').value.trim();
-      if (!title) throw new Error('请输入酒局名称');
+      if (!title) throw domainError('请输入酒局名称', 'app');
       const nextStep = validInteger($('#settings-step').value, '快捷加减数量', 1, 99);
       if (!await commitLedger({ ...state.session, title }, '酒局设置已保存', { step: nextStep })) return;
       state.snapshots = state.snapshots.map(snapshot => ({ ...snapshot, title }));
       $('#settings-dialog').close();
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#settings-error').textContent = error.message; }
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#settings-error').textContent = error.message; }
   });
 
   $('#end-session-form').addEventListener('submit', async event => {
@@ -675,9 +676,9 @@ export async function connectBrowser(): Promise<void> {
       state.snapshots = [];
       render();
       $('#end-session-dialog').close();
-      if (state.session.endedAt === undefined) throw new Error('结束时间未保存');
+      if (state.session.endedAt === undefined) throw domainError('结束时间未保存', 'app');
       openSummary(state.session, state.session.endedAt);
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#end-session-error').textContent = error.message; }
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#end-session-error').textContent = error.message; }
     finally { button.disabled = false; }
   });
 
@@ -685,7 +686,7 @@ export async function connectBrowser(): Promise<void> {
     event.preventDefault();
     try {
       const title = $('#new-session-name').value.trim();
-      if (!title) throw new Error('请输入酒局名称');
+      if (!title) throw domainError('请输入酒局名称', 'app');
       const cupSize = validInteger($('#new-session-cup').value, '每杯数量', 1, 99);
       const next = startNextSession(state.ledger, { title, cupSize, members: ($('#keep-members').checked) ? state.ledger.session.members : [] }, Date.now(), crypto.randomUUID());
       if (!await commitLedger(next.session, state.session.endedAt !== undefined ? '新一局开始了' : '上一局已保存，新一局开始了', next)) return;
@@ -695,7 +696,7 @@ export async function connectBrowser(): Promise<void> {
       $('#settings-dialog').close();
       $('#session-dialog').close();
       switchView('ledger');
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#session-error').textContent = error.message; }
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught }); $('#session-error').textContent = error.message; }
   });
 
   $('#delete-member').addEventListener('click', () => {
@@ -726,7 +727,7 @@ export async function connectBrowser(): Promise<void> {
     const sequence = ++state.syncSequence;
     const epoch = state.ledgerEpoch;
     try {
-      if (!state.deviceClient) throw new Error('记录客户端尚未初始化');
+      if (!state.deviceClient) throw domainError('记录客户端尚未初始化', 'app');
       const data = await state.deviceClient.load();
       if (sequence !== state.syncSequence || epoch !== state.ledgerEpoch || state.saving || document.querySelector('dialog[open]')) return;
       if (data.revision === state.revision && data.generation === state.generation) { saveStatus('服务端已自动保存', 'cloud-check'); return; }
@@ -770,7 +771,7 @@ export async function connectBrowser(): Promise<void> {
       switchView(state.view);
       $('#load-notice').hidden = true;
       saveStatus('服务端已自动保存', 'cloud-check');
-    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       state.ready = false;
       $('#load-message').textContent = error.message || '记录无法加载，请检查网络和浏览器存储权限后重试';
       $('#retry-storage').hidden = false;
@@ -799,7 +800,7 @@ export async function connectBrowser(): Promise<void> {
       annotations: { readOnlyHint: true, untrustedContentHint: true },
       async execute(input: ExternalValue) {
         objectInput(input, 'read_current_drinking_session');
-        if (!state.ready) throw new Error('记录尚未加载');
+        if (!state.ready) throw domainError('记录尚未加载', 'app');
         return { title: state.session.title, round: state.session.round, demo: state.session.demo, cupSize: state.session.cupSize, members: structuredClone(state.session.members), leaderboard: leaderboard(state.session) };
       },
     });
@@ -812,9 +813,9 @@ export async function connectBrowser(): Promise<void> {
         const parsed = memberActionInput(input, state.step);
         const next = memberAction(state.session, parsed.memberId, parsed.action, parsed.quantity, { id: crypto.randomUUID(), at: Date.now() });
         state.selectedMemberId = parsed.memberId;
-        if (!await commitMember(next, '已完成记账', {})) throw new Error('记账未完成，请检查保存状态后重试');
+        if (!await commitMember(next, '已完成记账', {})) throw domainError('记账未完成，请检查保存状态后重试', 'app');
         const saved = state.session.members.find(member => member.id === parsed.memberId);
-        if (!saved) throw new Error('没有找到这位成员');
+        if (!saved) throw domainError('没有找到这位成员', 'app');
         return structuredClone(saved);
       },
     });

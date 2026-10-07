@@ -1,7 +1,8 @@
+import { databaseRow, storedLedger, memberSeen } from '../src/server/records.ts';
 import { draftIdentity } from '../src/client/actions.ts';
 import type { TestContext } from 'node:test';
 import type { ExternalValue, WorkerEnv } from '../src/shared/types.ts';
-import { requireLedger, databaseRow, storedLedger } from '../src/shared/values.ts';
+import { requireLedger } from '../src/shared/values.ts';
 import { decodeSnapshot } from '../src/shared/protocol.ts';
 import { applyMigrations, sqliteAdapter } from '../scripts/sqlite.ts';
 import { at, field } from '../src/shared/values.ts';
@@ -108,7 +109,7 @@ test('定时清理真实删除闲置设备；活跃设备也清理过期酒局�
   assert.equal(requireLedger(saved).history.length, 1);
   const raw = field(db.prepare('SELECT data FROM device_ledgers WHERE device_id = ?').get(id), 'data');
   assert.equal(typeof raw, 'string');
-  const stored = storedLedger(JSON.parse(String(raw)), restoreLedger);
+  const stored = storedLedger(JSON.parse(String(raw)));
   stored.ledger.history = ledger.history;
   stored.ledger.session.startedAt = cutoff - 1;
   at(stored.ledger.session.events, 0).at = cutoff - 1;
@@ -120,7 +121,7 @@ test('定时清理真实删除闲置设备；活跃设备也清理过期酒局�
   await worker.scheduled({ scheduledTime: now }, env);
   assert.equal(field(db.prepare('SELECT COUNT(*) AS count FROM device_ledgers WHERE device_id = ?').get(inactive), 'count'), 0);
   const row = databaseRow(db.prepare('SELECT * FROM device_ledgers WHERE device_id = ?').get(id));
-  const cleaned = storedLedger(JSON.parse(row.data), restoreLedger);
+  const cleaned = storedLedger(JSON.parse(row.data));
   assert.deepEqual(cleaned.ledger.history.map(entry => entry.id), ['boundary']);
   assert.deepEqual(cleaned.ledger.knownMembers.map(member => member.id), ['recent-friend']);
   assert.equal(cleaned.ledger.session.members.length, 0);
@@ -138,7 +139,7 @@ test('读写也执行过期清理，修改其他酒友不会无限续期被移�
   ledger.knownMembers = [{ id: 'removed', name: '已移除', color: 0 }];
   const saved = await readSnapshot(await request(id, 'PUT', { ledger, revision: 0, generation: null }));
   const row = databaseRow(db.prepare('SELECT * FROM device_ledgers WHERE device_id = ?').get(id));
-  const stored = storedLedger(JSON.parse(row.data), restoreLedger);
+  const stored = storedLedger(JSON.parse(row.data));
   stored.memberSeen.removed = Date.now() - RETENTION_MS - 10;
   db.prepare('UPDATE device_ledgers SET data = ?, cleanup_at = 0 WHERE device_id = ?').run(JSON.stringify(stored), id);
   const conflict = await request(id, 'PUT', { ...saved, ledger: { ...requireLedger(saved), step: 2 } });

@@ -1,9 +1,12 @@
+import { domainError } from '../shared/errors.ts';
+import { sessionInput } from '../shared/validation.ts';
 import type { Session, Summary, SummaryImage } from '../shared/types.ts';
 import { at } from '../shared/values.ts';
-import { leaderboard, validateSession } from '../shared/domain.ts';
+import { leaderboard } from '../shared/domain.ts';
 
 export function sessionSummary(session: Session, endedAt: number | undefined): Summary {
-  if (!validateSession(session) || typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < session.startedAt) throw new Error('请先结束本局，再生成总结');
+  sessionInput(session, 'summary.session');
+  if (typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < session.startedAt) throw domainError('请先结束本局，再生成总结', 'summary');
   return {
     title: session.title, round: session.round, cupSize: session.cupSize,
     startedAt: session.startedAt, endedAt, durationMs: endedAt - session.startedAt,
@@ -25,7 +28,7 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('当前浏览器无法生成图片，请换一个浏览器重试');
+  if (!ctx) throw domainError('当前浏览器无法生成图片，请换一个浏览器重试', 'summary');
   const font = '"PingFang SC", "Microsoft YaHei", sans-serif';
   const ink = '#33332e', muted = '#77746c', accent = '#ac573f';
   const text = (value: string | number, x: number, y: number, size: number, color: string, weight: number, align: CanvasTextAlign): void => {

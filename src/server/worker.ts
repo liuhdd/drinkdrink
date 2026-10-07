@@ -1,6 +1,9 @@
+import { diagnosticDatabase } from './database.ts';
+import { context, problem, isProblem, errorBody, parseJson, type RequestDetails } from '../shared/errors.ts';
+import { rowInput, storedLedger } from './records.ts';
 import { saveRequestInput } from '../shared/protocol.ts';
 import type { ExternalValue, WorkerEnv, LedgerDatabase, DatabaseRow, Snapshot, Ledger } from '../shared/types.ts';
-import { field, databaseRow, storedLedger } from '../shared/values.ts';
+import { field } from '../shared/values.ts';
 import { restoreLedger } from '../shared/persistence.ts';
 import { RETENTION_MS, retainLedger, prepareLedger } from './retention.ts';
 
@@ -9,13 +12,14 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 const empty = (): Snapshot => ({ ledger: null, revision: 0, generation: null });
 
 async function readRow(db: LedgerDatabase, deviceId: string): Promise<DatabaseRow | null> {
-  const value = await db.prepare('SELECT device_id, data, revision, generation, updated_at, cleanup_at FROM device_ledgers WHERE device_id = ?').bind(deviceId).first();
-  return value === null ? null : databaseRow(value);
+  const sql = 'SELECT device_id, data, revision, generation, updated_at, cleanup_at FROM device_ledgers WHERE device_id = ?';
+  const value = await db.prepare(sql).bind(deviceId).first();
+  return value === null ? null : rowInput(value, sql, [deviceId]);
 }
 
 async function pruneRow(db: LedgerDatabase, row: DatabaseRow, now: number): Promise<void> {
   if (row.cleanup_at >= now) return;
-  const stored = storedLedger(JSON.parse(row.data), restoreLedger);
+  const stored = decodeStored(row);
   const kept = retainLedger(stored.ledger, stored.memberSeen, now);
   // 仅数据内容变化才使已打开页面失效，清理不延长设备寿命。 Only a semantic change invalidates open pages. Cleanup never extends device lifetime.
   const changed = JSON.stringify({ ledger: kept.ledger, memberSeen: kept.memberSeen }) !== row.data;
@@ -33,15 +37,25 @@ async function readCurrent(db: LedgerDatabase, deviceId: string, now: number): P
   return row;
 }
 
-const responseData = (row: DatabaseRow | null): Snapshot => row ? { ledger: restoreLedger(storedLedger(JSON.parse(row.data), restoreLedger).ledger), revision: row.revision, generation: row.generation } : empty();
+function decodeStored(row: DatabaseRow) {
+  try { return storedLedger(parseJson(row.data, 'decode stored ledger')); }
+  catch (caught) {
+    if (!(caught instanceof Error)) throw caught;
+    throw problem('CORRUPT_STORAGE', `服务端账本损坏：${caught.message}`, { ...context('decode stored ledger', isProblem(caught) ? caught.details.path : null), responseBody: row.data, database: { sql: 'device_ledgers.data', parameters: [row.device_id] } }, caught);
+  }
+}
 
-export async function cleanupExpired(db: LedgerDatabase, now: number): Promise<void> {
+const responseData = (row: DatabaseRow | null): Snapshot => row ? { ledger: restoreLedger(decodeStored(row).ledger), revision: row.revision, generation: row.generation } : empty();
+
+export async function cleanupExpired(rawDatabase: LedgerDatabase, now: number): Promise<void> {
+  const db = diagnosticDatabase(rawDatabase);
   await db.prepare('DELETE FROM device_ledgers WHERE updated_at < ?').bind(now - RETENTION_MS).run();
   // 使用索引和有界批次，使定时任务符合 Worker 限制。 Indexed, bounded batches keep scheduled work within Worker limits.
   for (let batch = 0; batch < 10; batch++) {
-    const { results } = await db.prepare('SELECT device_id, data, revision, generation, updated_at, cleanup_at FROM device_ledgers WHERE cleanup_at < ? LIMIT 100').bind(now).all();
+    const sql = 'SELECT device_id, data, revision, generation, updated_at, cleanup_at FROM device_ledgers WHERE cleanup_at < ? LIMIT 100';
+    const { results } = await db.prepare(sql).bind(now).all();
     if (!results.length) break;
-    for (const row of results) await pruneRow(db, databaseRow(row), now);
+    for (const row of results) await pruneRow(db, rowInput(row, sql, [now]), now);
   }
 }
 
@@ -50,16 +64,18 @@ export default {
   async fetch(request: Request, env: WorkerEnv) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
-    if (url.pathname !== '/api/ledger') return json({ error: '接口不存在' }, 404);
-    if (!['GET', 'PUT'].includes(request.method)) return json({ error: '不支持此操作' }, 405);
+    if (url.pathname !== '/api/ledger') return rejected(request, 'HTTP', `接口不存在：${url.pathname}`, 404);
+    if (!['GET', 'PUT'].includes(request.method)) return rejected(request, 'HTTP', `不支持请求方法 ${request.method}，请使用 GET 或 PUT`, 405);
     const deviceId = request.headers.get('x-device-id');
-    if (deviceId === null || !uuid.test(deviceId)) return json({ error: '设备标识无效，请重新打开页面' }, 400);
-    if (request.headers.get('sec-fetch-site') === 'cross-site' || (request.method === 'PUT' && request.headers.get('origin') !== url.origin)) return json({ error: '请在本站访问记录' }, 403);
+    if (deviceId === null || !uuid.test(deviceId)) return rejected(request, 'VALIDATION', '设备标识无效，X-Device-ID 必须是 UUID v4', 400);
+    if (request.headers.get('sec-fetch-site') === 'cross-site' || (request.method === 'PUT' && request.headers.get('origin') !== url.origin)) return rejected(request, 'HTTP', `请在本站访问记录，Origin 必须是 ${url.origin}`, 403);
+    let requestBody: string | null = null;
     try {
       const now = Date.now();
-      if (request.method === 'GET') return json(responseData(await readCurrent(env.DB, deviceId, now)), 200);
-      if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: '记录格式无效' }, 400);
-      if (Number(request.headers.get('content-length')) > 2_000_000) return json({ error: '记录超过保存容量' }, 413);
+      const database = diagnosticDatabase(env.DB);
+      if (request.method === 'GET') return json(responseData(await readCurrent(database, deviceId, now)), 200);
+      if (!request.headers.get('content-type')?.startsWith('application/json')) return rejected(request, 'VALIDATION', '记录格式无效，Content-Type 必须是 application/json', 400);
+      if (Number(request.headers.get('content-length')) > 2_000_000) return rejected(request, 'VALIDATION', '记录超过保存容量，最大为 2000000 字节', 413);
       const chunks: Uint8Array[] = [];
       let size = 0;
       if (request.body) {
@@ -68,40 +84,63 @@ export default {
           const { value, done } = await reader.read();
           if (done) break;
           size += value.byteLength;
-          if (size > 2_000_000) { await reader.cancel(); return json({ error: '记录超过保存容量' }, 413); }
+          if (size > 2_000_000) { await reader.cancel(); return rejected(request, 'VALIDATION', '记录超过保存容量，最大为 2000000 字节', 413); }
           chunks.push(value);
         }
       }
       let data: { revision: number; generation: string | null };
       let ledger: Ledger;
       try {
-        const raw = new Uint8Array(size);
-        let offset = 0;
-        for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
-        const input: ExternalValue = JSON.parse(new TextDecoder().decode(raw));
+        requestBody = new TextDecoder().decode(combineChunks(chunks, size));
+        const input = parseJson(requestBody, 'decode save request');
         const parsed = saveRequestInput(input, now);
         data = { revision: parsed.revision, generation: parsed.generation };
         ledger = parsed.ledger;
-      } catch { return json({ error: '记录格式无效，未修改已保存数据' }, 400); }
-      const current = await readCurrent(env.DB, deviceId, now);
-      if ((current?.revision ?? 0) !== data.revision || (current && current.generation !== data.generation)) return json({ ...responseData(current), error: '另一页面已更新记录或旧数据已清理，已同步，请重试' }, 409);
-      const previous = current ? storedLedger(JSON.parse(current.data), restoreLedger) : null;
+      } catch (caught) {
+        if (!isProblem(caught instanceof Error ? caught : undefined) && !(caught instanceof SyntaxError)) throw caught;
+        const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+        const validation = isProblem(cause) ? cause : problem('VALIDATION', cause.message, context('decode save request', null), cause);
+        return errorResponse(validation, { method: request.method, url: request.url, body: requestBody, deviceId }, 400);
+      }
+      const current = await readCurrent(database, deviceId, now);
+      if ((current?.revision ?? 0) !== data.revision || (current && current.generation !== data.generation)) return conflictResponse(current, request, requestBody);
+      const previous = current ? decodeStored(current) : null;
       const finished = previous?.ledger.session;
       if (previous && finished?.endedAt !== undefined && ledger.session.startedAt === finished.startedAt && ledger.session.round === finished.round
-        && JSON.stringify(ledger.session) !== JSON.stringify(restoreLedger(previous.ledger).session)) return json({ error: '本局已结束，请新开一局，最终记录未修改' }, 400);
+        && JSON.stringify(ledger.session) !== JSON.stringify(restoreLedger(previous.ledger).session)) return errorResponse(problem('DOMAIN_RULE', '本局已结束，请新开一局，最终记录未修改', context('save ledger', 'ledger.session'), undefined), { method: request.method, url: request.url, body: requestBody, deviceId }, 400);
       const kept = prepareLedger(ledger, previous, now);
       const encoded = JSON.stringify({ ledger: kept.ledger, memberSeen: kept.memberSeen });
       const generation = current?.generation ?? crypto.randomUUID();
       const result = current
-        ? await env.DB.prepare('UPDATE device_ledgers SET data = ?, revision = revision + 1, updated_at = ?, cleanup_at = ? WHERE device_id = ? AND revision = ? AND generation = ?')
+        ? await database.prepare('UPDATE device_ledgers SET data = ?, revision = revision + 1, updated_at = ?, cleanup_at = ? WHERE device_id = ? AND revision = ? AND generation = ?')
           .bind(encoded, now, kept.cleanupAt, deviceId, data.revision, generation).run()
-        : await env.DB.prepare('INSERT INTO device_ledgers (device_id, data, revision, generation, updated_at, cleanup_at) VALUES (?, ?, 1, ?, ?, ?) ON CONFLICT(device_id) DO NOTHING')
+        : await database.prepare('INSERT INTO device_ledgers (device_id, data, revision, generation, updated_at, cleanup_at) VALUES (?, ?, 1, ?, ?, ?) ON CONFLICT(device_id) DO NOTHING')
           .bind(deviceId, encoded, generation, now, kept.cleanupAt).run();
-      if (!result.meta.changes) return json({ ...responseData(await readCurrent(env.DB, deviceId, now)), error: '另一页面已更新记录，已同步，请重试' }, 409);
+      if (!result.meta.changes) return conflictResponse(await readCurrent(database, deviceId, now), request, requestBody);
       return json({ ledger: kept.ledger, revision: data.revision + 1, generation }, 200);
-    } catch (error) {
-      console.error('Ledger storage unavailable', error);
-      return json({ error: '记录服务暂时不可用，请稍后重试' }, 503);
+    } catch (caught) {
+      const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
+      const failure = isProblem(cause) ? cause : problem('INTERNAL', `接口处理失败：${cause.message}`, context('ledger API', null), cause);
+      console.error(failure);
+      return errorResponse(failure, { method: request.method, url: request.url, body: requestBody, deviceId }, failure.code === 'STORAGE' ? 503 : failure.code === 'VALIDATION' || failure.code === 'DOMAIN_RULE' ? 400 : 500);
     }
   },
 };
+
+function combineChunks(chunks: readonly Uint8Array[], size: number): Uint8Array {
+  const raw = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
+  return raw;
+}
+function errorResponse(error: import('../shared/errors.ts').Problem, request: RequestDetails, status: number): Response {
+  return json(errorBody(problem(error.code, error.message, { ...error.details, request, status }, error.cause instanceof Error ? error.cause : undefined)), status);
+}
+
+function rejected(request: Request, code: import('../shared/errors.ts').ProblemCode, message: string, status: number): Response {
+  return errorResponse(problem(code, message, context('ledger API', null), undefined), { method: request.method, url: request.url, body: null, deviceId: request.headers.get('x-device-id') }, status);
+}
+function conflictResponse(row: DatabaseRow | null, request: Request, body: string | null): Response {
+  const details = { ...context('save ledger', 'request.revision/generation'), request: { method: request.method, url: request.url, body, deviceId: request.headers.get('x-device-id') }, status: 409 };
+  return json({ ...responseData(row), ...errorBody(problem('CONFLICT', `另一页面已更新记录或旧数据已清理，当前版本 ${row?.revision ?? 0}，已同步，请重试`, details, undefined)) }, 409);
+}

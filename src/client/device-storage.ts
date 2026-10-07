@@ -1,3 +1,5 @@
+import { parseJson } from '../shared/errors.ts';
+import { domainError } from '../shared/errors.ts';
 import type { LegacyStorage, Ledger, DeviceLedger } from '../shared/types.ts';
 import { field } from '../shared/values.ts';
 import { emptyLedger, restoreLedger, migrateLegacyLedger } from '../shared/persistence.ts';
@@ -8,13 +10,13 @@ export const LEGACY_STORAGE_KEY = 'cheers-ledger-v1';
 export function loadDeviceLedger(storage: LegacyStorage): DeviceLedger {
   const raw = storage.getItem(STORAGE_KEY);
   if (raw !== null) {
-    const data: import('../shared/types.ts').ExternalValue = JSON.parse(raw);
+    const data: import('../shared/types.ts').ExternalValue = parseJson(raw, 'decode local ledger');
     const revision = field(data, 'revision');
-    if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 1) throw new Error('本机记录版本无效');
+    if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 1) throw domainError('本机记录版本无效', 'device-storage');
     return { ledger: restoreLedger(field(data, 'ledger')), revision };
   }
   const legacy = storage.getItem(LEGACY_STORAGE_KEY);
-  return { ledger: legacy === null ? emptyLedger(Date.now()) : migrateLegacyLedger(JSON.parse(legacy)), revision: 0 };
+  return { ledger: legacy === null ? emptyLedger(Date.now()) : migrateLegacyLedger(parseJson(legacy, 'decode legacy ledger')), revision: 0 };
 }
 
 export function saveDeviceLedger(storage: LegacyStorage, ledger: Ledger, expectedRevision: number): DeviceLedger {

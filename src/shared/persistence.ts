@@ -1,7 +1,8 @@
-import { sessionInput, integerInput, required, profileInput, invalid } from './validation.ts';
+import { domainError } from './errors.ts';
+import { sessionInput, integerInput, required, profileInput, invalid, arrayInput, textInput, timestampInput } from './validation.ts';
 import type { ExternalValue, Profile, Member, Ledger, NextOptions, Archive } from './types.ts';
-import { field, list, isProfile } from './values.ts';
-import { createSession, demoSession, normalizeSessionCupSize, validateSession, validInteger } from './domain.ts';
+import { field, list } from './values.ts';
+import { createSession, demoSession, normalizeSessionCupSize, validInteger } from './domain.ts';
 
 const nameKey = (name: string): string => name.trim().toLowerCase();
 
@@ -29,19 +30,24 @@ export function restoreLedger(value: ExternalValue): Ledger {
   if (required(value, 'version', 'ledger') !== 2) invalid('ledger.version', '版本 2', version);
   const session = normalizeSessionCupSize(sessionInput(required(value, 'session', 'ledger'), 'ledger.session'));
   const step = integerInput(required(value, 'step', 'ledger'), 'ledger.step', 1, 99);
-  if (!Array.isArray(field(value, 'history')) || !Array.isArray(field(value, 'knownMembers'))) throw new Error('历史记录格式无效');
   const archiveIds = new Set<string>();
-  const history: Archive[] = list(field(value, 'history')).map(entry => {
-    const id = field(entry, 'id'), endedAt = field(entry, 'endedAt'), archived = field(entry, 'session');
-    if (typeof id !== 'string' || !id || archiveIds.has(id) || typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || !validateSession(archived) || archived.demo || endedAt < archived.startedAt) throw new Error('历史酒局格式无效');
+  const history: Archive[] = arrayInput(required(value, 'history', 'ledger'), 'ledger.history').map((entry, index) => {
+    const path = `ledger.history[${index}]`;
+    const id = textInput(required(entry, 'id', path), `${path}.id`, Number.MAX_SAFE_INTEGER);
+    const endedAt = timestampInput(required(entry, 'endedAt', path), `${path}.endedAt`);
+    const archived = sessionInput(required(entry, 'session', path), `${path}.session`);
+    if (archiveIds.has(id)) invalid(`${path}.id`, '不重复的归档 ID', id);
+    if (archived.demo) invalid(`${path}.session.demo`, '正式酒局', archived.demo);
+    if (endedAt < archived.startedAt) invalid(`${path}.endedAt`, '不早于开始时间', endedAt);
+    if (archived.endedAt !== undefined && archived.endedAt !== endedAt) invalid(`${path}.endedAt`, '与酒局结束时间一致', endedAt);
     archiveIds.add(id);
-    if (archived.endedAt !== undefined && archived.endedAt !== endedAt) throw new Error('历史酒局结束时间不一致');
-    return { id, endedAt, session: normalizeSessionCupSize(sessionInput(archived, 'ledger.history.session')) };
+    return { id, endedAt, session: normalizeSessionCupSize(archived) };
   });
   const ids = new Set<string>();
-  const knownMembers = list(field(value, 'knownMembers')).map((rawMember, index) => {
-    const member = profileInput(rawMember, `ledger.knownMembers[${index}]`);
-    if (!isProfile(member) || !member.id || ids.has(member.id) || !member.name.trim() || member.name.length > 12 || !Number.isInteger(member.color) || member.color < 0 || member.color > 5) throw new Error('已保存成员格式无效');
+  const knownMembers = arrayInput(required(value, 'knownMembers', 'ledger'), 'ledger.knownMembers').map((rawMember, index) => {
+    const path = `ledger.knownMembers[${index}]`;
+    const member = profileInput(rawMember, path);
+    if (ids.has(member.id)) invalid(`${path}.id`, '不重复的酒友 ID', member.id);
     ids.add(member.id);
     return { id: member.id, name: member.name.trim(), color: member.color };
   });
@@ -49,9 +55,9 @@ export function restoreLedger(value: ExternalValue): Ledger {
 }
 
 export function finishSession(ledger: Ledger, endedAt: number | string, archiveId: string): Ledger {
-  if (ledger.session.demo) throw new Error('体验酒局不归档，请先新开一局');
-  if (ledger.session.endedAt !== undefined) throw new Error('本局已结束');
-  if (typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < ledger.session.startedAt) throw new Error('结束时间无效');
+  if (ledger.session.demo) throw domainError('体验酒局不归档，请先新开一局', 'persistence');
+  if (ledger.session.endedAt !== undefined) throw domainError('本局已结束', 'persistence');
+  if (typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < ledger.session.startedAt) throw domainError('结束时间无效', 'persistence');
   const session = { ...structuredClone(ledger.session), endedAt };
   return {
     ...ledger, session,

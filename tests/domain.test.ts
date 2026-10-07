@@ -1,9 +1,10 @@
+import { sessionInput } from '../src/shared/validation.ts';
 import { draftIdentity } from '../src/client/actions.ts';
 import { recordAction as memberAction } from '../src/client/actions.ts';
 import { at, field } from '../src/shared/values.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, demoSession, leaderboard, validateSession, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../src/shared/domain.ts';
+import { createSession, demoSession, leaderboard, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../src/shared/domain.ts';
 
 test('加酒减酒仅影响该成员的待喝数量，并保留原状态', () => {
   const session = demoSession(Date.now());
@@ -67,7 +68,7 @@ test('旧记录杯量统一为本局设置，保留既有计数和操作记录',
   assert.deepEqual(migrated.members.map(({ cupSize, ...member }) => member), old.members.map(({ cupSize, ...member }) => member));
   assert.deepEqual(migrated.events, old.events);
   assert.equal(at(old.members, 2).cupSize, 3);
-  assert.equal(validateSession(migrated), true);
+  assert.deepEqual(sessionInput(migrated, 'session'), migrated);
 });
 
 test('批量添加多个酒友，各自待喝数量独立且使用本局杯量', () => {
@@ -79,7 +80,7 @@ test('批量添加多个酒友，各自待喝数量独立且使用本局杯量',
   ]);
   assert.equal(new Set(next.members.map(member => member.id)).size, 2);
   assert.deepEqual(original.members, []);
-  assert.equal(validateSession(next), true);
+  assert.deepEqual(sessionInput(next, 'session'), next);
   assert.deepEqual(next.events.map(event => event.amount), [7, 4]);
   const consumed = memberAction(next, at(next.members, 1).id, 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   assert.equal(at(consumed.members, 1).pending, 4);
@@ -103,10 +104,10 @@ test('批量添加完整验证后才生效，拒绝空昵称、重复昵称和�
 test('恢复已保存的记账数据，包括直接编辑待喝为零的操作', () => {
   const session = memberAction(demoSession(Date.now()), 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   session.events.unshift({ id: 'edited', memberId: 'demo-1', name: '阿杰', color: 0, action: 'set', amount: 0, at: Date.now() });
-  assert.equal(validateSession(JSON.parse(JSON.stringify(session))), true);
+  assert.deepEqual(sessionInput(JSON.parse(JSON.stringify(session)), 'session'), JSON.parse(JSON.stringify(session)));
   at(session.members, 0).cupSize = 0;
-  assert.equal(validateSession(session), false);
-  assert.equal(validateSession({ version: 99 }), false);
+  assert.throws(() => sessionInput(session, 'session'));
+  assert.throws(() => sessionInput({ version: 99 }, 'session'));
 });
 
 test('无效输入无法污染计数', () => {

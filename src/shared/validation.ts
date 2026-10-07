@@ -1,8 +1,9 @@
+import { validationError } from './errors.ts';
 import type { ExternalValue, Session, Member, Profile, LedgerEvent, SaveRequest } from './types.ts';
 import { field, list } from './values.ts';
 
 export function invalid(path: string, expected: string, value: ExternalValue): never {
-  throw new TypeError(`记录 ${path} 必须是${expected}，收到 ${String(value)}`);
+  throw validationError(path, expected, value);
 }
 export function objectInput(value: ExternalValue, path: string): object {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) invalid(path, '对象', value);
@@ -40,8 +41,8 @@ export function sessionInput(value: ExternalValue, path: string): Session {
   const version = required(value, 'version', path), demo = required(value, 'demo', path);
   if (version !== 1) invalid(`${path}.version`, '版本 1', version);
   if (typeof demo !== 'boolean') invalid(`${path}.demo`, '布尔值', demo);
-  const members = list(required(value, 'members', path)).map((member, index) => memberInput(member, `${path}.members[${index}]`));
-  const events = list(required(value, 'events', path)).map((event, index) => eventInput(event, `${path}.events[${index}]`));
+  const members = arrayInput(required(value, 'members', path), `${path}.members`).map((member, index) => memberInput(member, `${path}.members[${index}]`));
+  const events = arrayInput(required(value, 'events', path), `${path}.events`).map((event, index) => eventInput(event, `${path}.events[${index}]`));
   if (members.length > 30 || events.length > 80) invalid(path, '最多 30 位成员、80 条操作', value);
   if (new Set(members.map(member => member.id)).size !== members.length) invalid(`${path}.members`, '不重复的成员 ID', value);
   const startedAt = timestampInput(required(value, 'startedAt', path), `${path}.startedAt`);
@@ -58,4 +59,14 @@ export function memberActionInput(value: ExternalValue, step: number): MemberAct
   const rawQuantity = field(value, 'quantity');
   const quantity = rawQuantity === undefined ? step : integerInput(rawQuantity, 'action.quantity', 1, 99);
   return { memberId, action, quantity };
+}
+
+export function uuidInput(value: ExternalValue, path: string): string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) invalid(path, 'UUID v4', value);
+  return value;
+}
+
+export function arrayInput(value: ExternalValue, path: string): ExternalValue[] {
+  if (!Array.isArray(value)) invalid(path, '集合', value);
+  return value;
 }

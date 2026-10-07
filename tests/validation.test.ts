@@ -1,10 +1,11 @@
+import { databaseRow, storedLedger, memberSeen } from '../src/server/records.ts';
 import { migrateLegacyLedger } from '../src/shared/persistence.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyLedger, restoreLedger } from '../src/shared/persistence.ts';
 import { memberActionInput } from '../src/shared/validation.ts';
 import { saveRequestInput } from '../src/shared/protocol.ts';
-import { databaseRow, memberSeen, at } from '../src/shared/values.ts';
+import { at } from '../src/shared/values.ts';
 
 test('当前账本要求完整强类型字段，无关字段不进入成员、操作和酒局', () => {
   const ledger = emptyLedger(Date.now());
