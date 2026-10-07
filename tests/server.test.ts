@@ -1,3 +1,4 @@
+import { draftIdentity } from '../src/client/actions.ts';
 import type { TestContext } from 'node:test';
 import type { ExternalValue, WorkerEnv } from '../src/shared/types.ts';
 import { requireLedger, databaseRow, storedLedger } from '../src/shared/values.ts';
@@ -27,7 +28,7 @@ function setup(t: TestContext) {
   return { db, env, fetch, request };
 }
 
-const ledgerWithMember = () => ({ ...emptyLedger(), session: addMembers(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1, demo: false }), [{ name: '酒友甲', pending: 4 }], []) });
+const ledgerWithMember = () => ({ ...emptyLedger(Date.now()), session: addMembers(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1 }, Date.now()), [{ name: '酒友甲', pending: 4 }], [], draftIdentity([{ name: '酒友甲', pending: 4 }].length)) });
 const memoryStorage = () => {
   const values = new Map<string, string>();
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
@@ -39,7 +40,7 @@ test('结束本局通过服务端保存，重新加载保持最终结果，下�
   const client = createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() });
   const initial = await client.initialize();
   const active = await client.save(ledgerWithMember(), initial.revision, initial.generation);
-  const finished = finishSession(requireLedger(active), Date.now());
+  const finished = finishSession(requireLedger(active), Date.now(), crypto.randomUUID());
   await client.save(finished, active.revision, active.generation);
   const refreshed = await createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() }).initialize();
   assert.deepEqual(requireLedger(refreshed), finished);
@@ -47,7 +48,7 @@ test('结束本局通过服务端保存，重新加载保持最终结果，下�
   at(edited.session.members, 0).pending++;
   await assert.rejects(() => client.save(edited, refreshed.revision, refreshed.generation), /已结束/);
   assert.deepEqual(await client.load(), refreshed);
-  const next = startNextSession(requireLedger(refreshed), { title: '下次小聚', cupSize: 2, keepMembers: true }, Date.now());
+  const next = startNextSession(requireLedger(refreshed), { title: '下次小聚', cupSize: 2, members: requireLedger(refreshed).session.members }, Date.now(), crypto.randomUUID());
   const saved = await client.save(next, refreshed.revision, refreshed.generation);
   assert.equal(requireLedger(saved).history.length, 1);
   assert.equal(at(requireLedger(saved).history, 0).endedAt, finished.session.endedAt);
@@ -63,7 +64,7 @@ test('已结束酒局按结束时间保留30天，到期后当前结果和归档
   const ledger = ledgerWithMember();
   ledger.session.startedAt = now - RETENTION_MS - 1000;
   ledger.session.events = [];
-  const finished = finishSession(ledger, now - 1000);
+  const finished = finishSession(ledger, now - 1000, crypto.randomUUID());
   assert.deepEqual(retainLedger(finished, {}, now).ledger.session, finished.session);
   assert.ok(finished.session.endedAt !== undefined);
   const boundary = retainLedger(finished, {}, finished.session.endedAt + RETENTION_MS).ledger;
@@ -88,7 +89,7 @@ test('无需登录，设备隔离；读写冲突不会覆盖账本，代际标�
   assert.equal((await readSnapshot(await request(id, 'GET', undefined))).revision, 2);
   db.prepare('UPDATE device_ledgers SET updated_at = ? WHERE device_id = ?').run(Date.now() - RETENTION_MS - 1000, id);
   assert.equal((await readSnapshot(await request(id, 'GET', undefined))).revision, 0);
-  const replacement = await readSnapshot(await request(id, 'PUT', { ledger: emptyLedger(), revision: 0, generation: null }));
+  const replacement = await readSnapshot(await request(id, 'PUT', { ledger: emptyLedger(Date.now()), revision: 0, generation: null }));
   assert.notEqual(replacement.generation, saved.generation);
   assert.equal((await request(id, 'PUT', saved)).status, 409);
   assert.equal(at(requireLedger(await readSnapshot(await request(id, 'GET', undefined))).session.members, 0).id, 'demo-1');
@@ -114,7 +115,7 @@ test('定时清理真实删除闲置设备；活跃设备也清理过期酒局�
   stored.memberSeen['old-friend'] = cutoff - 1;
   stored.memberSeen['recent-friend'] = cutoff;
   db.prepare('UPDATE device_ledgers SET data = ?, cleanup_at = ? WHERE device_id = ?').run(JSON.stringify(stored), cutoff, id);
-  await request(inactive, 'PUT', { ledger: emptyLedger(), revision: 0, generation: null });
+  await request(inactive, 'PUT', { ledger: emptyLedger(Date.now()), revision: 0, generation: null });
   db.prepare('UPDATE device_ledgers SET updated_at = ? WHERE device_id = ?').run(cutoff - 1, inactive);
   await worker.scheduled({ scheduledTime: now }, env);
   assert.equal(field(db.prepare('SELECT COUNT(*) AS count FROM device_ledgers WHERE device_id = ?').get(inactive), 'count'), 0);
@@ -169,8 +170,8 @@ test('服务端拒绝跨站请求、损坏/超大/未来数据；存储失败保
 
 test('体验局中用户添加的真实成员和计数也会在 30 天后清理', () => {
   const now = Date.now();
-  const ledger = emptyLedger();
-  ledger.session = addMembers(ledger.session, [{ name: '真实用户', pending: 8 }], []);
+  const ledger = emptyLedger(Date.now());
+  ledger.session = addMembers(ledger.session, [{ name: '真实用户', pending: 8 }], [], draftIdentity([{ name: '真实用户', pending: 8 }].length));
   ledger.session.startedAt = now - RETENTION_MS - 1;
   const kept = retainLedger(ledger, {}, now);
   assert.equal(kept.ledger.session.demo, true);

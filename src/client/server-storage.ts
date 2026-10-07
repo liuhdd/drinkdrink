@@ -52,7 +52,7 @@ export function createDeviceClient({ storage, fetch: request, randomUUID }: Devi
     async initialize() {
       let data = await call('GET', undefined);
       if (!data.ledger) {
-        const initial = storage.getItem(MIGRATION_KEY) === identify() ? emptyLedger() : loadDeviceLedger(storage).ledger;
+        const initial = storage.getItem(MIGRATION_KEY) === identify() ? emptyLedger(Date.now()) : loadDeviceLedger(storage).ledger;
         try { data = await save(initial, 0, null); }
         catch (error) { const conflict = error instanceof Error ? errorSnapshot(error) : null; if (!conflict?.ledger) throw error; data = conflict; }
       }

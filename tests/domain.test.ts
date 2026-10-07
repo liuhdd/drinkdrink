@@ -1,23 +1,25 @@
+import { draftIdentity } from '../src/client/actions.ts';
+import { recordAction as memberAction } from '../src/client/actions.ts';
 import { at, field } from '../src/shared/values.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, demoSession, memberAction, leaderboard, validateSession, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../src/shared/domain.ts';
+import { createSession, demoSession, leaderboard, validateSession, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../src/shared/domain.ts';
 
 test('加酒减酒仅影响该成员的待喝数量，并保留原状态', () => {
-  const session = demoSession();
-  const added = memberAction(session, 'demo-1', 'add', 4);
+  const session = demoSession(Date.now());
+  const added = memberAction(session, 'demo-1', 'add', 4, { id: crypto.randomUUID(), at: Date.now() });
   assert.equal(at(added.members, 0).pending, 10);
   assert.equal(at(session.members, 0).pending, 6);
   assert.deepEqual(added.members.slice(1), session.members.slice(1));
-  const removed = memberAction(added, 'demo-1', 'subtract', 3);
+  const removed = memberAction(added, 'demo-1', 'subtract', 3, { id: crypto.randomUUID(), at: Date.now() });
   assert.equal(at(removed.members, 0).pending, 7);
   assert.equal(at(removed.members, 0).consumed, 8);
 });
 
 test('喝完一杯采用本局统一杯量，同时更新待喝、已喝与杯数', () => {
-  const session = demoSession();
+  const session = demoSession(Date.now());
   at(session.members, 2).cupSize = 3;
-  const after = memberAction(session, 'demo-3', 'drink', 1);
+  const after = memberAction(session, 'demo-3', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   assert.equal(at(after.members, 2).pending, at(session.members, 2).pending - session.cupSize);
   assert.equal(at(after.members, 2).consumed, at(session.members, 2).consumed + session.cupSize);
   assert.equal(at(after.members, 2).cups, at(session.members, 2).cups + 1);
@@ -26,28 +28,28 @@ test('喝完一杯采用本局统一杯量，同时更新待喝、已喝与杯�
 });
 
 test('数量不足与溢出操作被拒绝，原状态不受影响', () => {
-  const session = demoSession();
-  assert.throws(() => memberAction(session, 'demo-4', 'subtract', 3), /不能小于/);
+  const session = demoSession(Date.now());
+  assert.throws(() => memberAction(session, 'demo-4', 'subtract', 3, { id: crypto.randomUUID(), at: Date.now() }), /不能小于/);
   at(session.members, 0).pending = 1;
-  assert.throws(() => memberAction(session, 'demo-1', 'drink', 1), /不足/);
+  assert.throws(() => memberAction(session, 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() }), /不足/);
   at(session.members, 0).pending = MAX_COUNT;
-  assert.throws(() => memberAction(session, 'demo-1', 'add', 1), /上限/);
+  assert.throws(() => memberAction(session, 'demo-1', 'add', 1, { id: crypto.randomUUID(), at: Date.now() }), /上限/);
   at(session.members, 0).consumed = MAX_COUNT;
-  assert.throws(() => memberAction(session, 'demo-1', 'drink', 1), /上限/);
+  assert.throws(() => memberAction(session, 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() }), /上限/);
 });
 
 test('排行榜采用已喝个数，杯数不同仍正确排序，相同分数并列', () => {
-  const session = demoSession();
+  const session = demoSession(Date.now());
   at(session.members, 1).consumed = 8;
   const ranked = leaderboard(session);
   assert.deepEqual(ranked.map(member => member.id), ['demo-1', 'demo-2', 'demo-3', 'demo-4']);
   assert.deepEqual(ranked.map(member => member.rank), [1, 1, 3, 4]);
-  assert.equal(leaderboard(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1, demo: false }))[0], undefined);
+  assert.equal(leaderboard(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1 }, Date.now()))[0], undefined);
 });
 
 test('新开一局清空所有计数与记录，保留成员并应用统一杯量', () => {
-  const old = memberAction(demoSession(), 'demo-1', 'drink', 1);
-  const fresh = createSession({ title: '第二局', cupSize: 4, members: old.members, round: 2, demo: false });
+  const old = memberAction(demoSession(Date.now()), 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
+  const fresh = createSession({ title: '第二局', cupSize: 4, members: old.members, round: 2 }, Date.now());
   assert.equal(fresh.demo, false);
   assert.equal(fresh.round, 2);
   assert.equal(fresh.events.length, 0);
@@ -57,7 +59,7 @@ test('新开一局清空所有计数与记录，保留成员并应用统一杯�
 });
 
 test('旧记录杯量统一为本局设置，保留既有计数和操作记录', () => {
-  const old = memberAction(demoSession(), 'demo-1', 'drink', 1);
+  const old = memberAction(demoSession(Date.now()), 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   at(old.members, 2).cupSize = 3;
   at(old.members, 3).cupSize = 1;
   const migrated = normalizeSessionCupSize(old);
@@ -69,8 +71,8 @@ test('旧记录杯量统一为本局设置，保留既有计数和操作记录',
 });
 
 test('批量添加多个酒友，各自待喝数量独立且使用本局杯量', () => {
-  const original = createSession({ cupSize: 3, title: '今晚的酒局', members: [], round: 1, demo: false });
-  const next = addMembers(original, [{ name: ' 阿杰 ', pending: 4 }, { name: '小林', pending: 7 }], []);
+  const original = createSession({ cupSize: 3, title: '今晚的酒局', members: [], round: 1 }, Date.now());
+  const next = addMembers(original, [{ name: ' 阿杰 ', pending: 4 }, { name: '小林', pending: 7 }], [], draftIdentity([{ name: ' 阿杰 ', pending: 4 }, { name: '小林', pending: 7 }].length));
   assert.deepEqual(next.members.map(({ name, pending, cupSize, consumed, cups }) => ({ name, pending, cupSize, consumed, cups })), [
     { name: '阿杰', pending: 4, cupSize: 3, consumed: 0, cups: 0 },
     { name: '小林', pending: 7, cupSize: 3, consumed: 0, cups: 0 },
@@ -79,27 +81,27 @@ test('批量添加多个酒友，各自待喝数量独立且使用本局杯量',
   assert.deepEqual(original.members, []);
   assert.equal(validateSession(next), true);
   assert.deepEqual(next.events.map(event => event.amount), [7, 4]);
-  const consumed = memberAction(next, at(next.members, 1).id, 'drink', 1);
+  const consumed = memberAction(next, at(next.members, 1).id, 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   assert.equal(at(consumed.members, 1).pending, 4);
   assert.equal(at(consumed.members, 1).consumed, 3);
   assert.deepEqual(at(consumed.members, 0), at(next.members, 0));
 });
 
 test('批量添加完整验证后才生效，拒绝空昵称、重复昵称和人数超限', () => {
-  const original = demoSession();
+  const original = demoSession(Date.now());
   const before = structuredClone(original);
   for (const drafts of [[], [{ name: '新酒友', pending: 1 }, { name: ' ', pending: 1 }], [{ name: '新人' }, { name: '新人' }], [{ name: '阿杰' }], [{ name: 'abcdefghijklmn' }], [{ name: '新人', pending: -1 }]]) {
-    assert.throws(() => addMembers(original, drafts, []));
+    assert.throws(() => addMembers(original, drafts, [], draftIdentity(drafts.length)));
     assert.deepEqual(original, before);
   }
-  const almostFull = addMembers(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1, demo: false }), Array.from({ length: 29 }, (_, index) => ({ name: `成员${index}` })), []);
-  assert.equal(addMembers(almostFull, [{ name: '第30位' }], []).members.length, 30);
-  assert.throws(() => addMembers(almostFull, [{ name: '第30位' }, { name: '第31位' }], []), /30/);
+  const almostFull = addMembers(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1 }, Date.now()), Array.from({ length: 29 }, (_, index) => ({ name: `成员${index}` })), [], draftIdentity(Array.from({ length: 29 }, (_, index) => ({ name: `成员${index}` })).length));
+  assert.equal(addMembers(almostFull, [{ name: '第30位' }], [], draftIdentity([{ name: '第30位' }].length)).members.length, 30);
+  assert.throws(() => addMembers(almostFull, [{ name: '第30位' }, { name: '第31位' }], [], draftIdentity([{ name: '第30位' }, { name: '第31位' }].length)), /30/);
   assert.equal(almostFull.members.length, 29);
 });
 
 test('恢复已保存的记账数据，包括直接编辑待喝为零的操作', () => {
-  const session = memberAction(demoSession(), 'demo-1', 'drink', 1);
+  const session = memberAction(demoSession(Date.now()), 'demo-1', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() });
   session.events.unshift({ id: 'edited', memberId: 'demo-1', name: '阿杰', color: 0, action: 'set', amount: 0, at: Date.now() });
   assert.equal(validateSession(JSON.parse(JSON.stringify(session))), true);
   at(session.members, 0).cupSize = 0;
@@ -109,8 +111,8 @@ test('恢复已保存的记账数据，包括直接编辑待喝为零的操作',
 
 test('无效输入无法污染计数', () => {
   for (const quantity of [-1, 0, 1.5, '', 'NaN']) {
-    assert.throws(() => memberAction(demoSession(), 'demo-1', 'add', quantity));
+    assert.throws(() => memberAction(demoSession(Date.now()), 'demo-1', 'add', quantity, { id: crypto.randomUUID(), at: Date.now() }));
   }
-  assert.throws(() => memberAction(demoSession(), 'missing', 'drink', 1), /没有找到/);
-  assert.throws(() => memberAction(demoSession(), 'demo-1', 'invalid', 1), /未知/);
+  assert.throws(() => memberAction(demoSession(Date.now()), 'missing', 'drink', 1, { id: crypto.randomUUID(), at: Date.now() }), /没有找到/);
+  assert.throws(() => memberAction(demoSession(Date.now()), 'demo-1', 'invalid', 1, { id: crypto.randomUUID(), at: Date.now() }), /未知/);
 });

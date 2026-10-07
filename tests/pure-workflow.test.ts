@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createSession, addMembers, completeCup } from '../src/shared/domain.ts';
+import { restoreLedger, finishSession, startNextSession } from '../src/shared/persistence.ts';
+import { retainLedger, RETENTION_MS } from '../src/server/retention.ts';
+import { at } from '../src/shared/values.ts';
+
+test('固定时间和ID的业务流程可重复执行，冻结输入仍可结束归档及清理', () => {
+  const now = 1_800_000_000_000;
+  const session = createSession({ title: '纯函数酒局', cupSize: 2, round: 1, members: [] }, now);
+  Object.freeze(session.members); Object.freeze(session.events); Object.freeze(session);
+  const identity = { at: now + 1, memberIds: ['friend'], eventIds: ['added'] };
+  const added = addMembers(session, [{ name: '酒友', pending: 4 }], [], identity);
+  assert.deepEqual(addMembers(session, [{ name: '酒友', pending: 4 }], [], identity), added);
+  Object.freeze(at(added.members, 0)); Object.freeze(added.members); Object.freeze(added.events); Object.freeze(added);
+  const drunk = completeCup(added, 'friend', { id: 'drunk', at: now + 2 });
+  assert.deepEqual(completeCup(added, 'friend', { id: 'drunk', at: now + 2 }), drunk);
+  const ledger = restoreLedger({ session: drunk, step: 1 });
+  Object.freeze(ledger.history); Object.freeze(ledger.knownMembers); Object.freeze(ledger);
+  const ended = finishSession(ledger, now + 3, 'archive');
+  assert.deepEqual(finishSession(ledger, now + 3, 'archive'), ended);
+  const next = startNextSession(ended, { title: '新局', cupSize: 3, members: ended.session.members }, now + 4, 'unused');
+  assert.equal(next.session.startedAt, now + 4);
+  assert.equal(next.history.length, 1);
+  const expiredAt = now + RETENTION_MS + 10;
+  const cleaned = retainLedger(ended, {}, expiredAt);
+  assert.deepEqual(retainLedger(ended, {}, expiredAt), cleaned);
+  assert.equal(cleaned.ledger.session.startedAt, expiredAt);
+  assert.equal(at(added.members, 0).pending, 4);
+  assert.equal(ledger.session.endedAt, undefined);
+});

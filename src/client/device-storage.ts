@@ -14,7 +14,7 @@ export function loadDeviceLedger(storage: LegacyStorage): DeviceLedger {
     return { ledger: restoreLedger(field(data, 'ledger')), revision };
   }
   const legacy = storage.getItem(LEGACY_STORAGE_KEY);
-  return { ledger: legacy === null ? emptyLedger() : restoreLedger(JSON.parse(legacy)), revision: 0 };
+  return { ledger: legacy === null ? emptyLedger(Date.now()) : restoreLedger(JSON.parse(legacy)), revision: 0 };
 }
 
 export function saveDeviceLedger(storage: LegacyStorage, ledger: Ledger, expectedRevision: number): DeviceLedger {

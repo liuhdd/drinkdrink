@@ -6,9 +6,9 @@ export interface LedgerEvent extends Profile { memberId: string; action: Action;
 export interface Session { version: 1; title: string; cupSize: number; round: number; startedAt: number; demo: boolean; members: Member[]; events: LedgerEvent[]; endedAt?: number; }
 export interface Archive { id: string; endedAt: number; session: Session; }
 export interface Ledger { version: 2; session: Session; step: number; history: Archive[]; knownMembers: Profile[]; }
-export interface SessionOptions { title: string; cupSize: number; members: readonly Profile[]; round: number; demo: boolean; }
+export interface SessionOptions { title: string; cupSize: number; members: readonly Profile[]; round: number; }
 export interface Draft { name?: string | undefined; pending?: number | string; knownMemberId?: string | undefined; }
-export interface NextOptions { title: string; cupSize: number; keepMembers: boolean; }
+export interface NextOptions { title: string; cupSize: number; members: readonly Profile[]; }
 export interface RankedMember extends Member { rank: number; }
 export interface Snapshot { ledger: Ledger | null; revision: number; generation: string | null; }
 export interface DeviceLedger { ledger: Ledger; revision: number; }
@@ -28,3 +28,5 @@ export interface LedgerDatabase { prepare(sql: string): DatabaseStatement; }
 export interface WorkerEnv { DB: LedgerDatabase; ASSETS: { fetch(request: Request): Promise<Response> | Response }; }
 export interface Summary { title: string; round: number; cupSize: number; startedAt: number; endedAt: number; durationMs: number; totals: { members: number; consumed: number; cups: number; pending: number }; members: RankedMember[]; }
 export interface SummaryImage { blob: Blob; filename: string; summary: Summary; }
+export interface EventIdentity { id: string; at: number; }
+export interface DraftIdentity { memberIds: readonly string[]; eventIds: readonly string[]; at: number; }

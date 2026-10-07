@@ -19,8 +19,8 @@ export function availableMembers(knownMembers: readonly Profile[], session: impo
   return knownMembers.filter(member => !ids.has(member.id) && !names.has(nameKey(member.name)));
 }
 
-export function emptyLedger(): Ledger {
-  return { version: 2, session: demoSession(), step: 1, history: [], knownMembers: [] };
+export function emptyLedger(startedAt: number): Ledger {
+  return { version: 2, session: demoSession(startedAt), step: 1, history: [], knownMembers: [] };
 }
 
 export function restoreLedger(value: ExternalValue): Ledger {
@@ -50,7 +50,7 @@ export function restoreLedger(value: ExternalValue): Ledger {
   return { version: 2, session, step, history, knownMembers };
 }
 
-export function finishSession(ledger: Ledger, endedAt: number | string): Ledger {
+export function finishSession(ledger: Ledger, endedAt: number | string, archiveId: string): Ledger {
   if (ledger.session.demo) throw new Error('体验酒局不归档，请先新开一局');
   if (ledger.session.endedAt !== undefined) throw new Error('本局已结束');
   if (typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < ledger.session.startedAt) throw new Error('结束时间无效');
@@ -58,15 +58,18 @@ export function finishSession(ledger: Ledger, endedAt: number | string): Ledger 
   return {
     ...ledger, session,
     knownMembers: rememberMembers(ledger.knownMembers, session.members),
-    history: [{ id: crypto.randomUUID(), endedAt, session: structuredClone(session) }, ...ledger.history],
+    history: [{ id: archiveId, endedAt, session: structuredClone(session) }, ...ledger.history],
   };
 }
 
-export function startNextSession(ledger: Ledger, { title, cupSize, keepMembers }: NextOptions, endedAt: number): Ledger {
-  const session = createSession({ title, cupSize, members: keepMembers ? ledger.session.members : [], round: ledger.session.demo ? 1 : ledger.session.round + 1, demo: false });
+export function startNextSession(ledger: Ledger, { title, cupSize, members }: NextOptions, endedAt: number, archiveId: string): Ledger {
+  const session = createSession({ title, cupSize, members, round: ledger.session.demo ? 1 : ledger.session.round + 1 }, endedAt);
   return {
     ...ledger, session,
     knownMembers: ledger.session.demo ? ledger.knownMembers : rememberMembers(ledger.knownMembers, ledger.session.members),
-    history: ledger.session.demo || ledger.session.endedAt !== undefined ? ledger.history : [{ id: crypto.randomUUID(), endedAt: Math.max(endedAt, ledger.session.startedAt), session: structuredClone(ledger.session) }, ...ledger.history],
+    history: ledger.session.demo || ledger.session.endedAt !== undefined ? ledger.history : [{ id: archiveId, endedAt: Math.max(endedAt, ledger.session.startedAt), session: structuredClone(ledger.session) }, ...ledger.history],
   };
+}
+export function withLedgerSession(ledger: Ledger, session: import('./types.ts').Session, changes: Partial<Ledger>): Ledger {
+  return { ...ledger, ...changes, session, knownMembers: rememberMembers(changes.knownMembers ?? ledger.knownMembers, session.demo ? [] : session.members) };
 }
