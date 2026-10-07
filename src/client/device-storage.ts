@@ -1,6 +1,6 @@
 import type { LegacyStorage, Ledger, DeviceLedger } from '../shared/types.ts';
 import { field } from '../shared/values.ts';
-import { emptyLedger, restoreLedger } from '../shared/persistence.ts';
+import { emptyLedger, restoreLedger, migrateLegacyLedger } from '../shared/persistence.ts';
 
 export const STORAGE_KEY = 'cheers-ledger-v2';
 export const LEGACY_STORAGE_KEY = 'cheers-ledger-v1';
@@ -14,7 +14,7 @@ export function loadDeviceLedger(storage: LegacyStorage): DeviceLedger {
     return { ledger: restoreLedger(field(data, 'ledger')), revision };
   }
   const legacy = storage.getItem(LEGACY_STORAGE_KEY);
-  return { ledger: legacy === null ? emptyLedger(Date.now()) : restoreLedger(JSON.parse(legacy)), revision: 0 };
+  return { ledger: legacy === null ? emptyLedger(Date.now()) : migrateLegacyLedger(JSON.parse(legacy)), revision: 0 };
 }
 
 export function saveDeviceLedger(storage: LegacyStorage, ledger: Ledger, expectedRevision: number): DeviceLedger {

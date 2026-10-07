@@ -1,3 +1,4 @@
+import { migrateLegacyLedger } from '../src/shared/persistence.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSession, addMembers, completeCup } from '../src/shared/domain.ts';
@@ -15,7 +16,7 @@ test('固定时间和ID的业务流程可重复执行，冻结输入仍可结束
   Object.freeze(at(added.members, 0)); Object.freeze(added.members); Object.freeze(added.events); Object.freeze(added);
   const drunk = completeCup(added, 'friend', { id: 'drunk', at: now + 2 });
   assert.deepEqual(completeCup(added, 'friend', { id: 'drunk', at: now + 2 }), drunk);
-  const ledger = restoreLedger({ session: drunk, step: 1 });
+  const ledger = migrateLegacyLedger({ session: drunk, step: 1 });
   Object.freeze(ledger.history); Object.freeze(ledger.knownMembers); Object.freeze(ledger);
   const ended = finishSession(ledger, now + 3, 'archive');
   assert.deepEqual(finishSession(ledger, now + 3, 'archive'), ended);

@@ -1,3 +1,4 @@
+import { sessionInput, integerInput, required, profileInput, invalid } from './validation.ts';
 import type { ExternalValue, Profile, Member, Ledger, NextOptions, Archive } from './types.ts';
 import { field, list, isProfile } from './values.ts';
 import { createSession, demoSession, normalizeSessionCupSize, validateSession, validInteger } from './domain.ts';
@@ -24,14 +25,10 @@ export function emptyLedger(startedAt: number): Ledger {
 }
 
 export function restoreLedger(value: ExternalValue): Ledger {
-  const version = field(value, 'version'), rawSession = field(value, 'session');
-  if (!value || (version !== undefined && version !== 2) || !validateSession(rawSession)) throw new Error('酒局记录格式无效');
-  const session = normalizeSessionCupSize(rawSession);
-  const step = validInteger(field(value, 'step') ?? 1, '快捷加减数量', 1, 99);
-  if (version === undefined) {
-    const members = session.demo ? session.members.filter(member => !/^demo-[1-4]$/.test(member.id)) : session.members;
-    return { version: 2, session, step, history: [], knownMembers: rememberMembers([], members) };
-  }
+  const version = field(value, 'version');
+  if (required(value, 'version', 'ledger') !== 2) invalid('ledger.version', '版本 2', version);
+  const session = normalizeSessionCupSize(sessionInput(required(value, 'session', 'ledger'), 'ledger.session'));
+  const step = integerInput(required(value, 'step', 'ledger'), 'ledger.step', 1, 99);
   if (!Array.isArray(field(value, 'history')) || !Array.isArray(field(value, 'knownMembers'))) throw new Error('历史记录格式无效');
   const archiveIds = new Set<string>();
   const history: Archive[] = list(field(value, 'history')).map(entry => {
@@ -39,10 +36,11 @@ export function restoreLedger(value: ExternalValue): Ledger {
     if (typeof id !== 'string' || !id || archiveIds.has(id) || typeof endedAt !== 'number' || !Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || !validateSession(archived) || archived.demo || endedAt < archived.startedAt) throw new Error('历史酒局格式无效');
     archiveIds.add(id);
     if (archived.endedAt !== undefined && archived.endedAt !== endedAt) throw new Error('历史酒局结束时间不一致');
-    return { id, endedAt, session: normalizeSessionCupSize(archived) };
+    return { id, endedAt, session: normalizeSessionCupSize(sessionInput(archived, 'ledger.history.session')) };
   });
   const ids = new Set<string>();
-  const knownMembers = list(field(value, 'knownMembers')).map(member => {
+  const knownMembers = list(field(value, 'knownMembers')).map((rawMember, index) => {
+    const member = profileInput(rawMember, `ledger.knownMembers[${index}]`);
     if (!isProfile(member) || !member.id || ids.has(member.id) || !member.name.trim() || member.name.length > 12 || !Number.isInteger(member.color) || member.color < 0 || member.color > 5) throw new Error('已保存成员格式无效');
     ids.add(member.id);
     return { id: member.id, name: member.name.trim(), color: member.color };
@@ -72,4 +70,13 @@ export function startNextSession(ledger: Ledger, { title, cupSize, members }: Ne
 }
 export function withLedgerSession(ledger: Ledger, session: import('./types.ts').Session, changes: Partial<Ledger>): Ledger {
   return { ...ledger, ...changes, session, knownMembers: rememberMembers(changes.knownMembers ?? ledger.knownMembers, session.demo ? [] : session.members) };
+}
+
+// 旧版兼容只在迁移入口进行，当前账本不能缺失字段。 Apply legacy compatibility only during migration, never to current ledgers.
+export function migrateLegacyLedger(value: ExternalValue): Ledger {
+  if (field(value, 'version') !== undefined || field(value, 'history') !== undefined || field(value, 'knownMembers') !== undefined) invalid('legacy', '仅含旧版酒局与步长的账本', value);
+  const session = normalizeSessionCupSize(sessionInput(required(value, 'session', 'legacy'), 'legacy.session'));
+  const step = validInteger(field(value, 'step') ?? 1, '快捷加减数量', 1, 99);
+  const members = session.demo ? session.members.filter(member => !/^demo-[1-4]$/.test(member.id)) : session.members;
+  return { version: 2, session, step, history: [], knownMembers: rememberMembers([], members) };
 }

@@ -26,26 +26,16 @@ export function at<T>(values: readonly T[], index: number): T {
   if (value === undefined) throw new RangeError(`集合索引 ${index} 不存在`);
   return value;
 }
-export function errorSnapshot(error: Error): Snapshot | null {
-  const value = field(error, 'data');
-  const ledger = field(value, 'ledger'), revision = field(value, 'revision'), generation = field(value, 'generation');
-  if (typeof revision !== 'number' || (generation !== null && typeof generation !== 'string') || (ledger !== null && !isSessionShape(field(ledger, 'session')))) return null;
-  if (ledger !== null && !isLedgerShape(ledger)) return null;
-  return { ledger, revision, generation };
-}
-export function isLedgerShape(value: ExternalValue): value is import('./types.ts').Ledger {
-  return field(value, 'version') === 2 && isSessionShape(field(value, 'session')) && typeof field(value, 'step') === 'number' && Array.isArray(field(value, 'history')) && list(field(value, 'history')).every(entry => typeof field(entry, 'id') === 'string' && typeof field(entry, 'endedAt') === 'number' && isSessionShape(field(entry, 'session'))) && Array.isArray(field(value, 'knownMembers')) && list(field(value, 'knownMembers')).every(isProfile);
-}
 export function databaseRow(value: ExternalValue): DatabaseRow {
   const device_id = field(value, 'device_id'), data = field(value, 'data'), revision = field(value, 'revision'), generation = field(value, 'generation'), updated_at = field(value, 'updated_at'), cleanup_at = field(value, 'cleanup_at');
-  if (typeof device_id !== 'string' || typeof data !== 'string' || typeof revision !== 'number' || typeof generation !== 'string' || typeof updated_at !== 'number' || typeof cleanup_at !== 'number') throw new TypeError('数据库记录格式无效');
+  if (typeof device_id !== 'string' || typeof data !== 'string' || typeof revision !== 'number' || typeof generation !== 'string' || typeof updated_at !== 'number' || typeof cleanup_at !== 'number' || !Number.isSafeInteger(revision) || revision < 1 || !Number.isFinite(new Date(updated_at).getTime()) || !Number.isFinite(new Date(cleanup_at).getTime()) || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(device_id) || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(generation)) throw new TypeError('数据库记录格式无效');
   return { device_id, data, revision, generation, updated_at, cleanup_at };
 }
 export function memberSeen(value: ExternalValue): MemberSeen {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('成员时间格式无效');
   return Object.fromEntries(Object.keys(value).map(key => {
     const at = field(value, key);
-    if (typeof at !== 'number') throw new TypeError('成员时间格式无效');
+    if (typeof at !== 'number' || !Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) throw new TypeError('成员时间格式无效');
     return [key, at];
   }));
 }

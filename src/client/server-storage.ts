@@ -1,6 +1,6 @@
-import { decodeSnapshot } from '../shared/protocol.ts';
+import { decodeSnapshot, errorSnapshot } from '../shared/protocol.ts';
 import type { ExternalValue, DeviceOptions, DeviceClient, Snapshot, Ledger, SaveRequest } from '../shared/types.ts';
-import { field, errorSnapshot } from '../shared/values.ts';
+import { field } from '../shared/values.ts';
 import { emptyLedger, restoreLedger } from '../shared/persistence.ts';
 import { loadDeviceLedger, STORAGE_KEY, LEGACY_STORAGE_KEY } from './device-storage.ts';
 

@@ -1,7 +1,9 @@
+import { errorSnapshot } from '../shared/protocol.ts';
+import { objectInput, memberActionInput } from '../shared/validation.ts';
 import { draftIdentity } from './actions.ts';
 import { recordAction as memberAction } from './actions.ts';
 import type { Session, Profile, Ledger, DeviceClient, SummaryImage, ExternalValue, LedgerEvent } from '../shared/types.ts';
-import { at, field, errorSnapshot, requireLedger } from '../shared/values.ts';
+import { at, field, requireLedger } from '../shared/values.ts';
 import { element, target, closest } from './elements.ts';
 import { leaderboard, addMembers, validInteger, MAX_COUNT } from '../shared/domain.ts';
 import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession, finishSession, withLedgerSession } from '../shared/persistence.ts';
@@ -793,10 +795,10 @@ export async function connectBrowser(): Promise<void> {
     register({
       name: 'read_current_drinking_session', title: '读取本局记账',
       description: 'Read the current session, per-member pending counts, consumed counts, cup sizes and leaderboard. No state changes.',
-      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      inputSchema: { type: 'object', properties: {}, additionalProperties: true },
       annotations: { readOnlyHint: true, untrustedContentHint: true },
       async execute(input: ExternalValue) {
-        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) throw new Error('请输入空对象');
+        objectInput(input, 'read_current_drinking_session');
         if (!state.ready) throw new Error('记录尚未加载');
         return { title: state.session.title, round: state.session.round, demo: state.session.demo, cupSize: state.session.cupSize, members: structuredClone(state.session.members), leaderboard: leaderboard(state.session) };
       },
@@ -804,15 +806,14 @@ export async function connectBrowser(): Promise<void> {
     register({
       name: 'record_member_drinking_action', title: '为成员记酒',
       description: 'Add or subtract pending drink units for one existing member, or complete one cup using the current round’s shared cup size. Changes the visible ledger and current-round leaderboard; supports UI undo.',
-      inputSchema: { type: 'object', properties: { memberId: { type: 'string' }, action: { type: 'string', enum: ['add', 'subtract', 'drink'] }, quantity: { type: 'integer', minimum: 1, maximum: 99 } }, required: ['memberId', 'action'], additionalProperties: false },
+      inputSchema: { type: 'object', properties: { memberId: { type: 'string' }, action: { type: 'string', enum: ['add', 'subtract', 'drink'] }, quantity: { type: 'integer', minimum: 1, maximum: 99 } }, required: ['memberId', 'action'], additionalProperties: true },
       annotations: { readOnlyHint: false, untrustedContentHint: true },
       async execute(input: ExternalValue) {
-        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['memberId', 'action', 'quantity'].includes(key)) || typeof field(input, 'memberId') !== 'string' || !['add', 'subtract', 'drink'].includes(String(field(input, 'action')))) throw new Error('记账参数无效');
-        if (field(input, 'quantity') !== undefined) validInteger(field(input, 'quantity'), '加减数量', 1, 99);
-        const next = memberAction(state.session, String(field(input, 'memberId')), String(field(input, 'action')), validInteger(field(input, 'quantity') ?? state.step, '加减数量', 1, 99), { id: crypto.randomUUID(), at: Date.now() });
-        state.selectedMemberId = String(field(input, 'memberId'));
+        const parsed = memberActionInput(input, state.step);
+        const next = memberAction(state.session, parsed.memberId, parsed.action, parsed.quantity, { id: crypto.randomUUID(), at: Date.now() });
+        state.selectedMemberId = parsed.memberId;
         if (!await commitMember(next, '已完成记账', {})) throw new Error('记账未完成，请检查保存状态后重试');
-        const saved = state.session.members.find(member => member.id === String(field(input, 'memberId')));
+        const saved = state.session.members.find(member => member.id === parsed.memberId);
         if (!saved) throw new Error('没有找到这位成员');
         return structuredClone(saved);
       },

@@ -1,3 +1,4 @@
+import { saveRequestInput } from '../shared/protocol.ts';
 import type { ExternalValue, WorkerEnv, LedgerDatabase, DatabaseRow, Snapshot, Ledger } from '../shared/types.ts';
 import { field, databaseRow, storedLedger } from '../shared/values.ts';
 import { restoreLedger } from '../shared/persistence.ts';
@@ -78,14 +79,9 @@ export default {
         let offset = 0;
         for (const chunk of chunks) { raw.set(chunk, offset); offset += chunk.byteLength; }
         const input: ExternalValue = JSON.parse(new TextDecoder().decode(raw));
-        const revision = field(input, 'revision'), generation = field(input, 'generation');
-        if (typeof revision !== 'number' || (generation !== null && typeof generation !== 'string')) throw new Error();
-        data = { revision, generation };
-        if (!Number.isSafeInteger(data.revision) || data.revision < 0 || field(field(input, 'ledger'), 'version') !== 2 || (data.revision > 0 && !uuid.test(data.generation ?? ''))) throw new Error();
-        ledger = restoreLedger(field(input, 'ledger'));
-        const dates = [ledger.session.startedAt, ...(ledger.session.endedAt === undefined ? [] : [ledger.session.endedAt]), ...ledger.session.events.map(event => event.at),
-          ...ledger.history.flatMap(entry => [entry.endedAt, entry.session.startedAt, ...entry.session.events.map(event => event.at)])];
-        if (dates.some(at => at > now + 5 * 60 * 1000)) throw new Error();
+        const parsed = saveRequestInput(input, now);
+        data = { revision: parsed.revision, generation: parsed.generation };
+        ledger = parsed.ledger;
       } catch { return json({ error: '记录格式无效，未修改已保存数据' }, 400); }
       const current = await readCurrent(env.DB, deviceId, now);
       if ((current?.revision ?? 0) !== data.revision || (current && current.generation !== data.generation)) return json({ ...responseData(current), error: '另一页面已更新记录或旧数据已清理，已同步，请重试' }, 409);
