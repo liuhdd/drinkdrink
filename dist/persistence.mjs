@@ -46,7 +46,7 @@ export function restoreLedger(value) {
   return { version: 2, session, step, history, knownMembers };
 }
 
-export function finishSession(ledger, endedAt = Date.now()) {
+export function finishSession(ledger, endedAt) {
   if (ledger.session.demo) throw new Error('体验酒局不归档，请先新开一局');
   if (ledger.session.endedAt !== undefined) throw new Error('本局已结束');
   if (!Number.isFinite(endedAt) || !Number.isFinite(new Date(endedAt).getTime()) || endedAt < ledger.session.startedAt) throw new Error('结束时间无效');
@@ -58,8 +58,8 @@ export function finishSession(ledger, endedAt = Date.now()) {
   };
 }
 
-export function startNextSession(ledger, { title, cupSize, keepMembers = false }, endedAt = Date.now()) {
-  const session = createSession({ title, cupSize, members: keepMembers ? ledger.session.members : [], round: ledger.session.demo ? 1 : ledger.session.round + 1 });
+export function startNextSession(ledger, { title, cupSize, keepMembers }, endedAt) {
+  const session = createSession({ title, cupSize, members: keepMembers ? ledger.session.members : [], round: ledger.session.demo ? 1 : ledger.session.round + 1, demo: false });
   return {
     ...ledger, session,
     knownMembers: ledger.session.demo ? ledger.knownMembers : rememberMembers(ledger.knownMembers, ledger.session.members),

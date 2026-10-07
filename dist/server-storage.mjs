@@ -6,7 +6,7 @@ export const MIGRATION_KEY = 'cheers-server-migrated-v1';
 export const SYNC_KEY = 'cheers-server-sync-v1';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createDeviceClient({ storage, fetch: request = globalThis.fetch, randomUUID = () => crypto.randomUUID() }) {
+export function createDeviceClient({ storage, fetch: request, randomUUID }) {
   let deviceId;
   const identify = () => {
     if (deviceId) return deviceId;
@@ -50,9 +50,9 @@ export function createDeviceClient({ storage, fetch: request = globalThis.fetch,
     return data;
   };
   return {
-    load: () => call('GET'), save,
+    load: () => call('GET', undefined), save,
     async initialize() {
-      let data = await call('GET');
+      let data = await call('GET', undefined);
       if (!data.ledger) {
         const initial = storage.getItem(MIGRATION_KEY) === identify() ? emptyLedger() : loadDeviceLedger(storage).ledger;
         try { data = await save(initial, 0, null); }

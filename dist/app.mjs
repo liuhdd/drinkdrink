@@ -37,7 +37,7 @@ const colors = [
   { bg: '#efdde1', fg: '#885966', name: '烟粉' },
 ];
 const colorStyle = color => `--avatar-bg:${colors[color]?.bg || colors[0].bg};--avatar-fg:${colors[color]?.fg || colors[0].fg}`;
-const avatar = (member, extra = '') => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
+const avatar = (member, extra) => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
 const number = value => Number(value).toLocaleString('zh-CN');
 let ledger = emptyLedger();
 let session = ledger.session;
@@ -60,11 +60,11 @@ let summaryTarget;
 let summaryImage;
 let summarySequence = 0;
 
-function hydrateIcons(root = document) {
+function hydrateIcons(root) {
   root.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 }
 
-function saveStatus(text, error = false) {
+function saveStatus(text, error) {
   $('#save-status').innerHTML = `${icon(error ? 'info' : 'cloud-check')}<span>${escapeHTML(text)}</span>`;
 }
 
@@ -92,13 +92,13 @@ async function saveToServer(value, expectedRevision) {
   }
 }
 
-async function commit(nextSession, message, undoable = true, changes = {}) {
+async function commit(nextSession, message, undoable, changes) {
   if (!ready || saving) {
-    toast(saving ? '正在保存，请稍等' : '请先重新加载记录', { error: true });
+    toast(saving ? '正在保存，请稍等' : '请先重新加载记录', { error: true, undo: false });
     return false;
   }
   if (session.endedAt !== undefined && nextSession.startedAt === session.startedAt && nextSession.round === session.round) {
-    toast('本局已结束，请新开一局', { error: true });
+    toast('本局已结束，请新开一局', { error: true, undo: false });
     return false;
   }
   const next = {
@@ -106,7 +106,7 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
     knownMembers: rememberMembers(changes.knownMembers ?? ledger.knownMembers, nextSession.demo ? [] : nextSession.members),
   };
   saving = true;
-  saveStatus('正在保存…');
+  saveStatus('正在保存…', false);
   try {
     const data = await saveToServer(next, revision);
     if (undoable) snapshots = [...snapshots, structuredClone(session)].slice(-30);
@@ -115,16 +115,16 @@ async function commit(nextSession, message, undoable = true, changes = {}) {
     saveStatus('未保存 · 请重试', true);
     const formError = [...document.querySelectorAll('dialog[open]')].at(-1)?.querySelector('.form-error');
     if (formError) formError.textContent = error.message || '保存失败，请重试';
-    toast(error.message || '保存失败，请重试', { error: true });
+    toast(error.message || '保存失败，请重试', { error: true, undo: false });
     return false;
   } finally { saving = false; }
-  saveStatus('服务端已自动保存');
+  saveStatus('服务端已自动保存', false);
   render();
-  if (message) toast(message, { undo: undoable });
+  if (message) toast(message, { undo: undoable, error: false });
   return true;
 }
 
-function toast(message, { undo = false, error = false } = {}) {
+function toast(message, { undo, error }) {
   clearTimeout(toastTimer);
   const element = $('#toast');
   element.className = `toast visible${error ? ' error' : ''}`;
@@ -135,7 +135,7 @@ function toast(message, { undo = false, error = false } = {}) {
 async function undo() {
   if (!snapshots.length || saving) return;
   const previous = snapshots.at(-1);
-  if (await commit(previous, '已撤销上一步', false)) {
+  if (await commit(previous, '已撤销上一步', false, {})) {
     snapshots.pop();
     render();
   }
@@ -162,12 +162,12 @@ function render() {
     const name = escapeHTML(member.name);
     const id = escapeHTML(member.id);
     const selected = member.id === selectedMemberId;
-    return `<button type="button" class="member-row${selected ? ' selected' : ''}" data-select-member="${id}" aria-pressed="${selected}" aria-label="选择${name}，待喝${member.pending}个" style="${colorStyle(member.color)}"><span class="member-row-identity">${avatar(member)}<span class="member-row-name">${name}</span>${selected ? `<span class="member-selected-mark">${icon('check')}</span>` : ''}</span><span class="member-row-count"><strong>${number(member.pending)}</strong><span>个</span></span></button>`;
+    return `<button type="button" class="member-row${selected ? ' selected' : ''}" data-select-member="${id}" aria-pressed="${selected}" aria-label="选择${name}，待喝${member.pending}个" style="${colorStyle(member.color)}"><span class="member-row-identity">${avatar(member, '')}<span class="member-row-name">${name}</span>${selected ? `<span class="member-selected-mark">${icon('check')}</span>` : ''}</span><span class="member-row-count"><strong>${number(member.pending)}</strong><span>个</span></span></button>`;
   }).join('') : finished ? '<div class="empty-members"><h3>本局已结束</h3><p>这一局没有添加成员，可以新开一局继续记录。</p></div>' : `<div class="empty-members"><span data-icon="users"></span><h3>酒友到齐，就开局</h3><p>添加第一位成员，开始记录今晚的每一杯。</p><button class="button primary" data-open="add-member">${icon('plus')}添加成员</button></div>`;
   renderMemberControls();
   const ranked = leaderboard(session);
   const max = ranked[0]?.consumed || 1;
-  $('#leaderboard').innerHTML = ranked.length ? ranked.map(member => `<div class="leader-row ${member.rank === 1 && member.consumed > 0 ? 'first' : ''}"><span class="rank-number">${member.rank === 1 && member.consumed > 0 ? icon('trophy') : String(member.rank).padStart(2, '0')}</span>${avatar(member)}<div class="leader-info"><div class="leader-name">${escapeHTML(member.name)}${member.rank === 1 && member.consumed > 0 ? '<span class="top-tag">本局领先</span>' : ''}</div><div class="leader-detail">${number(member.cups)} 杯 · 还待喝 ${number(member.pending)} 个</div><div class="leader-bar" aria-hidden="true"><span style="width:${member.consumed / max * 100}%"></span></div></div><div class="leader-score">${number(member.consumed)}<span>个</span></div></div>`).join('') : `<div class="ranking-empty">${icon('trophy')}<p>添加酒友后，排行从这里开始。</p></div>`;
+  $('#leaderboard').innerHTML = ranked.length ? ranked.map(member => `<div class="leader-row ${member.rank === 1 && member.consumed > 0 ? 'first' : ''}"><span class="rank-number">${member.rank === 1 && member.consumed > 0 ? icon('trophy') : String(member.rank).padStart(2, '0')}</span>${avatar(member, '')}<div class="leader-info"><div class="leader-name">${escapeHTML(member.name)}${member.rank === 1 && member.consumed > 0 ? '<span class="top-tag">本局领先</span>' : ''}</div><div class="leader-detail">${number(member.cups)} 杯 · 还待喝 ${number(member.pending)} 个</div><div class="leader-bar" aria-hidden="true"><span style="width:${member.consumed / max * 100}%"></span></div></div><div class="leader-score">${number(member.consumed)}<span>个</span></div></div>`).join('') : `<div class="ranking-empty">${icon('trophy')}<p>添加酒友后，排行从这里开始。</p></div>`;
   $('#activity-list').innerHTML = session.events.length ? session.events.slice(0, 5).map(event => {
     const text = event.action === 'drink' ? `喝完一杯 <em>扣减 ${event.amount} 个</em>` : event.action === 'add' ? `加了 <em>+${event.amount} 个</em>` : event.action === 'subtract' ? `减去 <em>−${event.amount} 个</em>` : `待喝调整为 <em>${event.amount} 个</em>`;
     return `<div class="activity-row">${avatar(event, 'activity-avatar')}<div class="activity-message"><strong>${escapeHTML(event.name)}</strong>${text}</div><time class="activity-time" datetime="${new Date(event.at).toISOString()}">${new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.at)}</time></div>`;
@@ -192,7 +192,7 @@ function openHistory(id) {
   if (!entry) return;
   $('#history-detail-title').textContent = entry.session.title;
   $('#history-detail-meta').textContent = `${dateTime(entry.session.startedAt)} — ${dateTime(entry.endedAt)} · 第 ${entry.session.round} 局 · 1 杯 = ${entry.session.cupSize} 个`;
-  $('#history-detail-members').innerHTML = leaderboard(entry.session).map(member => `<div class="history-member">${avatar(member)}<div><strong>${escapeHTML(member.name)}</strong><span>第 ${member.rank} 名 · ${number(member.cups)} 杯 · 待喝 ${number(member.pending)} 个</span></div><strong>${number(member.consumed)}<small> 个已喝</small></strong></div>`).join('') || '<p class="form-hint">这局没有成员。</p>';
+  $('#history-detail-members').innerHTML = leaderboard(entry.session).map(member => `<div class="history-member">${avatar(member, '')}<div><strong>${escapeHTML(member.name)}</strong><span>第 ${member.rank} 名 · ${number(member.cups)} 杯 · 待喝 ${number(member.pending)} 个</span></div><strong>${number(member.consumed)}<small> 个已喝</small></strong></div>`).join('') || '<p class="form-hint">这局没有成员。</p>';
   $('#history-detail-events').innerHTML = entry.session.events.map(event => {
     const text = { add: '加酒', subtract: '减酒', drink: '喝完一杯，扣减', set: '待喝调整为' }[event.action];
     return `<div class="activity-row"><div class="activity-message"><strong>${escapeHTML(event.name)}</strong>${text} ${event.amount} 个</div><time class="activity-time">${escapeHTML(dateTime(event.at))}</time></div>`;
@@ -307,7 +307,7 @@ function renderKnownMembers() {
     const ids = new Set(otherRows.map(item => item.dataset.knownMemberId).filter(Boolean));
     const names = new Set(otherRows.map(item => item.querySelector('.draft-name').value.trim().toLowerCase()).filter(Boolean));
     const choices = available.filter(member => !ids.has(member.id) && !names.has(member.name.toLowerCase()));
-    row.querySelector('.draft-options').innerHTML = choices.map(member => `<button type="button" class="draft-option" role="option" data-pick-member="${escapeHTML(member.id)}" aria-selected="${row.dataset.knownMemberId === member.id}"><span aria-hidden="true">${avatar(member)}</span><span>${escapeHTML(member.name)}</span></button>`).join('');
+    row.querySelector('.draft-options').innerHTML = choices.map(member => `<button type="button" class="draft-option" role="option" data-pick-member="${escapeHTML(member.id)}" aria-selected="${row.dataset.knownMemberId === member.id}"><span aria-hidden="true">${avatar(member, '')}</span><span>${escapeHTML(member.name)}</span></button>`).join('');
     row.querySelector('[data-toggle-members]').disabled = !choices.length;
     if (!choices.length) closeMemberOptions(row);
   }
@@ -322,7 +322,7 @@ function closeMemberOptions(onlyRow) {
 }
 
 function openMemberOptions(row) {
-  closeMemberOptions();
+  closeMemberOptions(null);
   const list = row.querySelector('.draft-options');
   if (!list.children.length) return;
   const field = row.querySelector('.member-name-field').getBoundingClientRect();
@@ -348,7 +348,7 @@ function appendMemberDraft() {
 }
 
 function openAddMembers() {
-  if (session.members.length >= 30) { toast('一局最多添加 30 位成员', { error: true }); return; }
+  if (session.members.length >= 30) { toast('一局最多添加 30 位成员', { error: true, undo: false }); return; }
   $('#draft-members').innerHTML = '';
   $('#add-members-error').textContent = '';
   draftMemberIndex = 0;
@@ -369,8 +369,8 @@ function openMember(id) {
 }
 
 function openDialog(name) {
-  if (!ready) { toast('请先重新加载记录', { error: true }); return; }
-  if (session.endedAt !== undefined && ['add-member', 'end-session'].includes(name)) { toast('本局已结束，请新开一局', { error: true }); return; }
+  if (!ready) { toast('请先重新加载记录', { error: true, undo: false }); return; }
+  if (session.endedAt !== undefined && ['add-member', 'end-session'].includes(name)) { toast('本局已结束，请新开一局', { error: true, undo: false }); return; }
   if (name === 'add-member') return openAddMembers();
   if (name === 'settings') {
     $('#settings-name').value = session.title;
@@ -378,7 +378,7 @@ function openDialog(name) {
     $('#settings-error').textContent = '';
     $('#settings-dialog').showModal();
   } else if (name === 'end-session') {
-    if (session.demo) { toast('请先新开一局，开始自己的记录'); return; }
+    if (session.demo) { toast('请先新开一局，开始自己的记录', { undo: false, error: false }); return; }
     const pending = session.members.reduce((total, member) => total + member.pending, 0);
     $('#end-session-message').textContent = `确认结束「${session.title}」？本局共 ${session.members.length} 位酒友，剩余待喝 ${number(pending)} 个。`;
     $('#end-session-error').textContent = '';
@@ -394,7 +394,7 @@ function openDialog(name) {
 }
 
 document.addEventListener('click', async event => {
-  if (!event.target.closest('.member-name-field')) closeMemberOptions();
+  if (!event.target.closest('.member-name-field')) closeMemberOptions(null);
   const button = event.target.closest('button');
   if (!button || button.disabled) return;
   if (button.dataset.view) switchView(button.dataset.view);
@@ -407,7 +407,7 @@ document.addEventListener('click', async event => {
   if (button.hasAttribute('data-retry-storage')) await initialize();
   if (button.hasAttribute('data-toggle-members')) {
     const row = button.closest('.member-draft-row');
-    if (row.querySelector('.draft-options').hidden) openMemberOptions(row); else closeMemberOptions();
+    if (row.querySelector('.draft-options').hidden) openMemberOptions(row); else closeMemberOptions(null);
   }
   if (button.dataset.pickMember) {
     const row = button.closest('.member-draft-row');
@@ -416,7 +416,7 @@ document.addEventListener('click', async event => {
     row.dataset.knownMemberId = profile.id;
     row.querySelector('.draft-name').value = profile.name;
     row.querySelector('.draft-name').focus();
-    closeMemberOptions();
+    closeMemberOptions(null);
     updateMemberDrafts();
     $('#add-members-error').textContent = '';
   }
@@ -447,9 +447,9 @@ document.addEventListener('click', async event => {
       const member = session.members.find(item => item.id === button.dataset.id);
       const next = memberAction(session, button.dataset.id, button.dataset.action, step);
       const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${session.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${step} 个`;
-      await commit(next, message);
+      await commit(next, message, true, {});
       $('#member-controls').querySelector(`[data-id="${CSS.escape(button.dataset.id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
-    } catch (error) { toast(error.message, { error: true }); }
+    } catch (error) { toast(error.message, { error: true, undo: false }); }
   }
 });
 
@@ -464,7 +464,7 @@ $('#draft-members').addEventListener('input', event => {
 });
 $('#draft-members').addEventListener('focusin', event => {
   if (event.target.matches('.draft-name')) openMemberOptions(event.target.closest('.member-draft-row'));
-  else if (!event.target.closest('.member-name-field')) closeMemberOptions();
+  else if (!event.target.closest('.member-name-field')) closeMemberOptions(null);
 });
 $('#draft-members').addEventListener('keydown', event => {
   const row = event.target.closest('.member-draft-row');
@@ -473,8 +473,8 @@ $('#draft-members').addEventListener('keydown', event => {
     event.preventDefault();
     event.stopPropagation();
     row.querySelector('.draft-name').focus();
-    closeMemberOptions();
-  } else if (event.key === 'Tab') closeMemberOptions();
+    closeMemberOptions(null);
+  } else if (event.key === 'Tab') closeMemberOptions(null);
   else if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
     event.preventDefault();
     const list = row.querySelector('.draft-options');
@@ -517,7 +517,7 @@ $('#member-form').addEventListener('submit', async event => {
     if (!name) throw new Error('请输入成员昵称');
     if (session.members.some(member => member.id !== editId && member.name.toLowerCase() === name.toLowerCase())) throw new Error('已有同名成员，请使用不同昵称');
     if (ledger.knownMembers.some(member => member.id !== editId && member.name.toLowerCase() === name.toLowerCase())) throw new Error('以前的酒友中已有此昵称，请使用不同昵称');
-    const pending = validInteger($('#member-pending').value, '待喝数量');
+    const pending = validInteger($('#member-pending').value, '待喝数量', 0, 9999);
     const old = session.members.find(member => member.id === editId);
     if (!old) throw new Error('没有找到这位成员');
     const member = { ...old, name, color: selectedColor, pending, cupSize: session.cupSize };
@@ -548,7 +548,7 @@ $('#end-session-form').addEventListener('submit', async event => {
   const button = $('#end-session-form button[type="submit"]');
   button.disabled = true;
   try {
-    const next = finishSession(ledger);
+    const next = finishSession(ledger, Date.now());
     if (!await commit(next.session, '本局已结束，最终记录已保存', false, next)) return;
     snapshots = [];
     render();
@@ -564,7 +564,7 @@ $('#session-form').addEventListener('submit', async event => {
     const title = $('#new-session-name').value.trim();
     if (!title) throw new Error('请输入酒局名称');
     const cupSize = validInteger($('#new-session-cup').value, '每杯数量', 1, 99);
-    const next = startNextSession(ledger, { title, cupSize, keepMembers: $('#keep-members').checked });
+    const next = startNextSession(ledger, { title, cupSize, keepMembers: $('#keep-members').checked }, Date.now());
     if (!await commit(next.session, session.endedAt !== undefined ? '新一局开始了' : '上一局已保存，新一局开始了', false, next)) return;
     snapshots = [];
     selectedMemberId = null;
@@ -586,7 +586,7 @@ $('#remove-form').addEventListener('submit', async event => {
   event.preventDefault();
   const member = session.members.find(item => item.id === editId);
   if (!member) return;
-  if (!await commit({ ...session, members: session.members.filter(item => item.id !== editId) }, `已移除${member.name}`)) return;
+  if (!await commit({ ...session, members: session.members.filter(item => item.id !== editId) }, `已移除${member.name}`, true, {})) return;
   $('#remove-dialog').close();
 });
 
@@ -605,13 +605,13 @@ async function syncFromServer() {
   try {
     const data = await deviceClient.load();
     if (sequence !== syncSequence || epoch !== ledgerEpoch || saving || document.querySelector('dialog[open]')) return;
-    if (data.revision === revision && data.generation === generation) { saveStatus('服务端已自动保存'); return; }
+    if (data.revision === revision && data.generation === generation) { saveStatus('服务端已自动保存', false); return; }
     if (data.generation === generation && data.revision < revision) return;
     applyLedger(data.ledger ?? emptyLedger(), data.revision, data.generation);
     snapshots = [];
     render();
-    saveStatus(data.ledger ? '服务端已自动保存' : '旧数据已自动清理');
-    toast(data.ledger ? '已同步服务端记录' : '超过 30 天的记录已自动清理');
+    saveStatus(data.ledger ? '服务端已自动保存' : '旧数据已自动清理', false);
+    toast(data.ledger ? '已同步服务端记录' : '超过 30 天的记录已自动清理', { undo: false, error: false });
   } catch { if (sequence === syncSequence && epoch === ledgerEpoch && !saving) saveStatus('服务端暂时无法连接', true); }
 }
 
@@ -633,9 +633,9 @@ async function initialize() {
   $('#history-panel').hidden = true;
   $('#finished-session').hidden = true;
   $('#end-session-button').hidden = true;
-  saveStatus('正在加载…');
+  saveStatus('正在加载…', false);
   try {
-    deviceClient ??= createDeviceClient({ storage: localStorage });
+    deviceClient ??= createDeviceClient({ storage: localStorage, fetch: globalThis.fetch, randomUUID: () => crypto.randomUUID() });
     const load = () => deviceClient.initialize();
     const data = navigator.locks?.request ? await navigator.locks.request('cheers-device-initialize', load) : await load();
     applyLedger(data.ledger, data.revision, data.generation);
@@ -644,7 +644,7 @@ async function initialize() {
     render();
     switchView(view);
     $('#load-notice').hidden = true;
-    saveStatus('服务端已自动保存');
+    saveStatus('服务端已自动保存', false);
   } catch (error) {
     ready = false;
     $('#load-message').textContent = error.message || '记录无法加载，请检查网络和浏览器存储权限后重试';
@@ -653,7 +653,7 @@ async function initialize() {
   }
 }
 
-hydrateIcons();
+hydrateIcons(document);
 await initialize();
 
 // Feature-detected WebMCP tools share the exact accounting actions used by the UI.
@@ -683,7 +683,7 @@ if (document.modelContext?.registerTool) {
       if (input.quantity !== undefined) validInteger(input.quantity, '加减数量', 1, 99);
       const next = memberAction(session, input.memberId, input.action, input.quantity ?? step);
       selectedMemberId = input.memberId;
-      if (!await commit(next, '已完成记账')) throw new Error('记账未完成，请检查保存状态后重试');
+      if (!await commit(next, '已完成记账', true, {})) throw new Error('记账未完成，请检查保存状态后重试');
       return structuredClone(session.members.find(member => member.id === input.memberId));
     },
   });

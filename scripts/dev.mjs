@@ -59,5 +59,5 @@ const server = createServer(async (incoming, outgoing) => {
   } catch (error) { console.error(error); outgoing.writeHead(500); outgoing.end('Local server error'); }
 });
 server.listen(port, '127.0.0.1', () => console.log(`本地预览：http://127.0.0.1:${port}`));
-await cleanupExpired(env.DB);
-setInterval(() => cleanupExpired(env.DB).catch(console.error), 60 * 60 * 1000).unref();
+await cleanupExpired(env.DB, Date.now());
+setInterval(() => cleanupExpired(env.DB, Date.now()).catch(console.error), 60 * 60 * 1000).unref();

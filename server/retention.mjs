@@ -4,13 +4,13 @@ import { restoreLedger } from '../dist/persistence.mjs';
 export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Member last-use timestamps live on the server, outside the browser-editable ledger.
-export function retainLedger(value, memberSeen = {}, now = Date.now()) {
+export function retainLedger(value, memberSeen, now) {
   const ledger = restoreLedger(value);
   const cutoff = now - RETENTION_MS;
   ledger.history = ledger.history.filter(entry => entry.endedAt >= cutoff).map(entry => ({
     ...entry, session: { ...entry.session, events: entry.session.events.filter(event => event.at >= cutoff) },
   }));
-  if ((ledger.session.endedAt ?? ledger.session.startedAt) < cutoff) ledger.session = ledger.session.demo ? demoSession() : createSession();
+  if ((ledger.session.endedAt ?? ledger.session.startedAt) < cutoff) ledger.session = ledger.session.demo ? demoSession() : createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1, demo: false });
   ledger.session = { ...ledger.session, events: ledger.session.events.filter(event => event.at >= cutoff) };
   const seen = Object.fromEntries(ledger.knownMembers.map(member => [member.id, Object.hasOwn(memberSeen, member.id) ? memberSeen[member.id] : now]).filter(([, at]) => at >= cutoff));
   ledger.knownMembers = ledger.knownMembers.filter(member => Object.hasOwn(seen, member.id));
@@ -20,7 +20,7 @@ export function retainLedger(value, memberSeen = {}, now = Date.now()) {
   return { ledger, memberSeen: seen, cleanupAt: Math.min(...dates) + RETENTION_MS };
 }
 
-export function prepareLedger(value, previous, now = Date.now()) {
+export function prepareLedger(value, previous, now) {
   const ledger = restoreLedger(value);
   const seen = { ...previous?.memberSeen };
   for (const profile of ledger.knownMembers) {

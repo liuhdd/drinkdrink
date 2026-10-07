@@ -1,7 +1,7 @@
 import { restoreLedger } from '../dist/persistence.mjs';
 import { RETENTION_MS, retainLedger, prepareLedger } from './retention.mjs';
 
-const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'X-Device-ID' } });
+const json = (value, status) => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'X-Device-ID' } });
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const empty = () => ({ ledger: null, revision: 0, generation: null });
 
@@ -31,7 +31,7 @@ async function readCurrent(db, deviceId, now) {
 
 const responseData = row => row ? { ledger: restoreLedger(JSON.parse(row.data).ledger), revision: row.revision, generation: row.generation } : empty();
 
-export async function cleanupExpired(db, now = Date.now()) {
+export async function cleanupExpired(db, now) {
   await db.prepare('DELETE FROM device_ledgers WHERE updated_at < ?').bind(now - RETENTION_MS).run();
   // Indexed, bounded batches keep scheduled work within Worker limits.
   for (let batch = 0; batch < 10; batch++) {
@@ -53,7 +53,7 @@ export default {
     if (request.headers.get('sec-fetch-site') === 'cross-site' || (request.method === 'PUT' && request.headers.get('origin') !== url.origin)) return json({ error: '请在本站访问记录' }, 403);
     try {
       const now = Date.now();
-      if (request.method === 'GET') return json(responseData(await readCurrent(env.DB, deviceId, now)));
+      if (request.method === 'GET') return json(responseData(await readCurrent(env.DB, deviceId, now)), 200);
       if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ error: '记录格式无效' }, 400);
       if (Number(request.headers.get('content-length')) > 2_000_000) return json({ error: '记录超过保存容量' }, 413);
       const chunks = [];
@@ -95,7 +95,7 @@ export default {
         : await env.DB.prepare('INSERT INTO device_ledgers (device_id, data, revision, generation, updated_at, cleanup_at) VALUES (?, ?, 1, ?, ?, ?) ON CONFLICT(device_id) DO NOTHING')
           .bind(deviceId, encoded, generation, now, kept.cleanupAt).run();
       if (!result.meta.changes) return json({ ...responseData(await readCurrent(env.DB, deviceId, now)), error: '另一页面已更新记录，已同步，请重试' }, 409);
-      return json({ ledger: kept.ledger, revision: data.revision + 1, generation });
+      return json({ ledger: kept.ledger, revision: data.revision + 1, generation }, 200);
     } catch (error) {
       console.error('Ledger storage unavailable', error);
       return json({ error: '记录服务暂时不可用，请稍后重试' }, 503);

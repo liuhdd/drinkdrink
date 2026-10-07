@@ -1,6 +1,6 @@
 export const MAX_COUNT = 9999;
 
-export function validInteger(value, label, min = 0, max = MAX_COUNT) {
+export function validInteger(value, label, min, max) {
   const number = Number(value);
   if (String(value).trim() === '' || !Number.isInteger(number) || number < min || number > max) {
     throw new Error(`${label}请输入 ${min}–${max} 之间的整数`);
@@ -8,7 +8,7 @@ export function validInteger(value, label, min = 0, max = MAX_COUNT) {
   return number;
 }
 
-export function createSession({ title = '今晚的酒局', cupSize = 2, members = [], round = 1, demo = false } = {}) {
+export function createSession({ title, cupSize, members, round, demo }) {
   const sharedCupSize = validInteger(cupSize, '每杯数量', 1, 99);
   return {
     version: 1, title, cupSize: sharedCupSize, round,
@@ -23,7 +23,7 @@ export function normalizeSessionCupSize(session) {
   return { ...session, members: session.members.map(member => ({ ...member, cupSize: session.cupSize })) };
 }
 
-export function addMembers(session, drafts, knownMembers = []) {
+export function addMembers(session, drafts, knownMembers) {
   if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   if (!Array.isArray(drafts) || drafts.length === 0) throw new Error('请至少添加一位酒友');
   if (session.members.length + drafts.length > 30) throw new Error('一局最多添加 30 位成员');
@@ -44,7 +44,7 @@ export function addMembers(session, drafts, knownMembers = []) {
     ids.add(id);
     return {
       id, name, color: known?.color ?? (session.members.length + index) % 6,
-      pending: validInteger(draft.pending ?? 0, `第 ${index + 1} 位成员待喝数量`),
+      pending: validInteger(draft.pending ?? 0, `第 ${index + 1} 位成员待喝数量`, 0, 9999),
       cupSize: session.cupSize, consumed: 0, cups: 0,
     };
   });
@@ -56,7 +56,7 @@ export function addMembers(session, drafts, knownMembers = []) {
   return normalizeSessionCupSize({ ...session, members: [...session.members, ...members], events: [...events.reverse(), ...session.events].slice(0, 80) });
 }
 
-export function memberAction(session, id, action, quantity = 1) {
+export function memberAction(session, id, action, quantity) {
   if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   const member = session.members.find(item => item.id === id);
   if (!member) throw new Error('没有找到这位成员');
@@ -109,9 +109,9 @@ export function validateSession(value) {
       ids.add(member.id);
       if (![member.cupSize, member.pending, member.consumed, member.cups].every(Number.isInteger)) return false;
       validInteger(member.cupSize, '杯量', 1, 99);
-      validInteger(member.pending, '待喝');
-      validInteger(member.consumed, '已喝');
-      validInteger(member.cups, '杯数');
+      validInteger(member.pending, '待喝', 0, 9999);
+      validInteger(member.consumed, '已喝', 0, 9999);
+      validInteger(member.cups, '杯数', 0, 9999);
       if (!Number.isInteger(member.color) || member.color < 0 || member.color > 5) return false;
     }
     if (!Array.isArray(value.events) || value.events.length > 80) return false;
@@ -124,7 +124,7 @@ export function validateSession(value) {
 }
 
 export function demoSession() {
-  const session = createSession({ title: '周末小聚', demo: true });
+  const session = createSession({ title: '周末小聚', demo: true, cupSize: 2, members: [], round: 1 });
   session.members = [
     { id: 'demo-1', name: '阿杰', color: 0, cupSize: 2, pending: 6, consumed: 8, cups: 4 },
     { id: 'demo-2', name: '小林', color: 1, cupSize: 2, pending: 4, consumed: 6, cups: 3 },

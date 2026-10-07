@@ -21,14 +21,14 @@ function setup(t) {
       async run() { return { meta: { changes: Number(db.prepare(sql).run(...params).changes) } }; },
     }; } }; } }, ASSETS: { fetch: () => new Response('asset') },
   };
-  const fetch = (path, options = {}) => worker.fetch(new Request(`https://ledger.test${path}`, {
+  const fetch = (path, options) => worker.fetch(new Request(`https://ledger.test${path}`, {
     ...options, headers: { ...options.headers, ...(options.method === 'PUT' ? { Origin: 'https://ledger.test' } : {}) },
   }), env);
-  const request = (id, method = 'GET', data) => fetch('/api/ledger', { method, headers: { 'X-Device-ID': id, 'Content-Type': 'application/json' }, ...(data ? { body: JSON.stringify(data) } : {}) });
+  const request = (id, method, data) => fetch('/api/ledger', { method, headers: { 'X-Device-ID': id, 'Content-Type': 'application/json' }, ...(data ? { body: JSON.stringify(data) } : {}) });
   return { db, env, fetch, request };
 }
 
-const ledgerWithMember = () => ({ ...emptyLedger(), session: addMembers(createSession(), [{ name: '酒友甲', pending: 4 }]) });
+const ledgerWithMember = () => ({ ...emptyLedger(), session: addMembers(createSession({ title: '今晚的酒局', cupSize: 2, members: [], round: 1, demo: false }), [{ name: '酒友甲', pending: 4 }], []) });
 const memoryStorage = () => {
   const values = new Map();
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
@@ -37,18 +37,18 @@ const memoryStorage = () => {
 test('结束本局通过服务端保存，重新加载保持最终结果，下一局不重复归档', async t => {
   const { fetch } = setup(t);
   const storage = memoryStorage();
-  const client = createDeviceClient({ storage, fetch });
+  const client = createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() });
   const initial = await client.initialize();
   const active = await client.save(ledgerWithMember(), initial.revision, initial.generation);
-  const finished = finishSession(active.ledger);
+  const finished = finishSession(active.ledger, Date.now());
   await client.save(finished, active.revision, active.generation);
-  const refreshed = await createDeviceClient({ storage, fetch }).initialize();
+  const refreshed = await createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() }).initialize();
   assert.deepEqual(refreshed.ledger, finished);
   const edited = structuredClone(finished);
   edited.session.members[0].pending++;
   await assert.rejects(() => client.save(edited, refreshed.revision, refreshed.generation), /已结束/);
   assert.deepEqual(await client.load(), refreshed);
-  const next = startNextSession(refreshed.ledger, { title: '下次小聚', cupSize: 2, keepMembers: true });
+  const next = startNextSession(refreshed.ledger, { title: '下次小聚', cupSize: 2, keepMembers: true }, Date.now());
   const saved = await client.save(next, refreshed.revision, refreshed.generation);
   assert.equal(saved.ledger.history.length, 1);
   assert.equal(saved.ledger.history[0].endedAt, finished.session.endedAt);
@@ -78,20 +78,20 @@ test('已结束酒局按结束时间保留30天，到期后当前结果和归档
 test('无需登录，设备隔离；读写冲突不会覆盖账本，代际标识阻止已删除账本的旧页面写回', async t => {
   const { request, db } = setup(t);
   const id = crypto.randomUUID(), other = crypto.randomUUID();
-  assert.equal((await request('missing')).status, 400);
+  assert.equal((await request('missing', 'GET', undefined)).status, 400);
   const saved = await (await request(id, 'PUT', { ledger: ledgerWithMember(), revision: 0, generation: null })).json();
   assert.equal(saved.revision, 1);
   assert.equal(saved.ledger.session.members[0].pending, 4);
-  assert.deepEqual(await (await request(other)).json(), { ledger: null, revision: 0, generation: null });
+  assert.deepEqual(await (await request(other, 'GET', undefined)).json(), { ledger: null, revision: 0, generation: null });
   const writes = await Promise.all([request(id, 'PUT', { ...saved, ledger: { ...saved.ledger, step: 2 } }), request(id, 'PUT', { ...saved, ledger: { ...saved.ledger, step: 3 } })]);
   assert.deepEqual(writes.map(response => response.status).sort(), [200, 409]);
-  assert.equal((await (await request(id)).json()).revision, 2);
+  assert.equal((await (await request(id, 'GET', undefined)).json()).revision, 2);
   db.prepare('UPDATE device_ledgers SET updated_at = ? WHERE device_id = ?').run(Date.now() - RETENTION_MS - 1000, id);
-  assert.equal((await (await request(id)).json()).revision, 0);
+  assert.equal((await (await request(id, 'GET', undefined)).json()).revision, 0);
   const replacement = await (await request(id, 'PUT', { ledger: emptyLedger(), revision: 0, generation: null })).json();
   assert.notEqual(replacement.generation, saved.generation);
   assert.equal((await request(id, 'PUT', saved)).status, 409);
-  assert.equal((await (await request(id)).json()).ledger.session.members[0].id, 'demo-1');
+  assert.equal((await (await request(id, 'GET', undefined)).json()).ledger.session.members[0].id, 'demo-1');
 });
 
 test('定时清理真实删除闲置设备；活跃设备也清理过期酒局、操作与未使用酒友，边界保留', async t => {
@@ -150,25 +150,25 @@ test('服务端拒绝跨站请求、损坏/超大/未来数据；存储失败保
   const id = crypto.randomUUID();
   const saved = await (await request(id, 'PUT', { ledger: ledgerWithMember(), revision: 0, generation: null })).json();
   assert.equal((await fetch('/api/ledger', { headers: { 'X-Device-ID': id, 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
-  assert.equal((await request(id, 'POST')).status, 405);
+  assert.equal((await request(id, 'POST', undefined)).status, 405);
   assert.equal((await request(id, 'PUT', { ...saved, ledger: {} })).status, 400);
   const future = structuredClone(saved);
   future.ledger.session.startedAt = Date.now() + 60 * 60 * 1000;
   assert.equal((await request(id, 'PUT', future)).status, 400);
   assert.equal((await fetch('/api/ledger', { method: 'PUT', headers: { 'X-Device-ID': id, 'Content-Type': 'application/json' }, body: ' '.repeat(2_000_001) })).status, 413);
-  assert.deepEqual(await (await request(id)).json(), saved);
+  assert.deepEqual(await (await request(id, 'GET', undefined)).json(), saved);
   const prepare = env.DB.prepare;
   env.DB.prepare = () => { throw new Error('test database unavailable'); };
   t.mock.method(console, 'error', () => {});
-  assert.equal((await request(id)).status, 503);
+  assert.equal((await request(id, 'GET', undefined)).status, 503);
   env.DB.prepare = prepare;
-  assert.deepEqual(await (await request(id)).json(), saved);
+  assert.deepEqual(await (await request(id, 'GET', undefined)).json(), saved);
 });
 
 test('体验局中用户添加的真实成员和计数也会在 30 天后清理', () => {
   const now = Date.now();
   const ledger = emptyLedger();
-  ledger.session = addMembers(ledger.session, [{ name: '真实用户', pending: 8 }]);
+  ledger.session = addMembers(ledger.session, [{ name: '真实用户', pending: 8 }], []);
   ledger.session.startedAt = now - RETENTION_MS - 1;
   const kept = retainLedger(ledger, {}, now);
   assert.equal(kept.ledger.session.demo, true);
@@ -181,16 +181,16 @@ test('旧浏览器记录迁移到服务端后清除本地账本，刷新恢复�
   const storage = memoryStorage();
   const original = { session: ledgerWithMember().session, step: 2 };
   storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(original));
-  const client = createDeviceClient({ storage, fetch });
+  const client = createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() });
   const migrated = await client.initialize();
   assert.equal(migrated.ledger.session.members[0].name, '酒友甲');
   assert.equal(storage.getItem(LEGACY_STORAGE_KEY), null);
   assert.equal(storage.getItem(STORAGE_KEY), null);
   assert.equal(storage.getItem(MIGRATION_KEY), storage.getItem(DEVICE_KEY));
-  assert.deepEqual(await createDeviceClient({ storage, fetch }).initialize(), migrated);
+  assert.deepEqual(await createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() }).initialize(), migrated);
   db.prepare('UPDATE device_ledgers SET updated_at = ?').run(Date.now() - RETENTION_MS - 1000);
   storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(original));
-  const fresh = await createDeviceClient({ storage, fetch }).initialize();
+  const fresh = await createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() }).initialize();
   assert.equal(fresh.ledger.session.demo, true);
   assert.equal(fresh.ledger.knownMembers.length, 0);
 });
@@ -202,16 +202,16 @@ test('新版记录优先迁移；网络失败、损坏备份和设备标识保�
   storage.setItem(STORAGE_KEY, JSON.stringify({ ledger, revision: 9 }));
   storage.setItem(LEGACY_STORAGE_KEY, 'broken legacy');
   const original = storage.getItem(STORAGE_KEY);
-  const offline = createDeviceClient({ storage, fetch: () => { throw new Error('offline'); } });
+  const offline = createDeviceClient({ storage, fetch: () => { throw new Error('offline'); }, randomUUID: () => crypto.randomUUID() });
   await assert.rejects(offline.initialize(), /网络/);
   assert.equal(storage.getItem(STORAGE_KEY), original);
-  const migrated = await createDeviceClient({ storage, fetch }).initialize();
+  const migrated = await createDeviceClient({ storage, fetch, randomUUID: () => crypto.randomUUID() }).initialize();
   assert.equal(migrated.ledger.session.members[0].name, '酒友甲');
   const bad = memoryStorage();
   bad.setItem(STORAGE_KEY, '{broken');
-  await assert.rejects(createDeviceClient({ storage: bad, fetch }).initialize());
+  await assert.rejects(createDeviceClient({ storage: bad, fetch, randomUUID: () => crypto.randomUUID() }).initialize());
   assert.equal(bad.getItem(STORAGE_KEY), '{broken');
-  const blocked = createDeviceClient({ storage: { getItem: () => null, setItem() { throw new Error('storage blocked'); } }, fetch });
+  const blocked = createDeviceClient({ storage: { getItem: () => null, setItem() { throw new Error('storage blocked'); } }, fetch, randomUUID: () => crypto.randomUUID() });
   await assert.rejects(blocked.initialize());
   await assert.rejects(blocked.initialize());
 });
