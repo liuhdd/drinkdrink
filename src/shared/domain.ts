@@ -1,6 +1,8 @@
+import type { ExternalValue, Session, SessionOptions, Profile, Draft, LedgerEvent, RankedMember } from './types.ts';
+import { at, isSessionShape } from './values.ts';
 export const MAX_COUNT = 9999;
 
-export function validInteger(value, label, min, max) {
+export function validInteger(value: ExternalValue, label: string, min: number, max: number): number {
   const number = Number(value);
   if (String(value).trim() === '' || !Number.isInteger(number) || number < min || number > max) {
     throw new Error(`${label}请输入 ${min}–${max} 之间的整数`);
@@ -8,7 +10,7 @@ export function validInteger(value, label, min, max) {
   return number;
 }
 
-export function createSession({ title, cupSize, members, round, demo }) {
+export function createSession({ title, cupSize, members, round, demo }: SessionOptions): Session {
   const sharedCupSize = validInteger(cupSize, '每杯数量', 1, 99);
   return {
     version: 1, title, cupSize: sharedCupSize, round,
@@ -19,11 +21,11 @@ export function createSession({ title, cupSize, members, round, demo }) {
 }
 
 // 杯量由酒局统一管理，保留 v1 成员结构兼容性。 Keep the stored v1 member shape compatible while the round owns the cup size.
-export function normalizeSessionCupSize(session) {
+export function normalizeSessionCupSize(session: Session): Session {
   return { ...session, members: session.members.map(member => ({ ...member, cupSize: session.cupSize })) };
 }
 
-export function addMembers(session, drafts, knownMembers) {
+export function addMembers(session: Session, drafts: readonly Draft[], knownMembers: readonly Profile[]): Session {
   if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   if (!Array.isArray(drafts) || drafts.length === 0) throw new Error('请至少添加一位酒友');
   if (session.members.length + drafts.length > 30) throw new Error('一局最多添加 30 位成员');
@@ -49,14 +51,14 @@ export function addMembers(session, drafts, knownMembers) {
     };
   });
   const at = Date.now();
-  const events = members.filter(member => member.pending > 0).map(member => ({
+  const events: LedgerEvent[] = members.filter(member => member.pending > 0).map(member => ({
     id: crypto.randomUUID(), memberId: member.id, name: member.name, color: member.color,
     action: 'set', amount: member.pending, at,
   }));
   return normalizeSessionCupSize({ ...session, members: [...session.members, ...members], events: [...events.reverse(), ...session.events].slice(0, 80) });
 }
 
-export function memberAction(session, id, action, quantity) {
+export function memberAction(session: Session, id: string, action: string, quantity: number | string): Session {
   if (session.endedAt !== undefined) throw new Error('本局已结束，请新开一局');
   const member = session.members.find(item => item.id === id);
   if (!member) throw new Error('没有找到这位成员');
@@ -79,24 +81,25 @@ export function memberAction(session, id, action, quantity) {
   } else {
     throw new Error('未知的记账操作');
   }
+  const event: LedgerEvent = { id: crypto.randomUUID(), memberId: id, name: member.name, color: member.color, action, amount, at: Date.now() };
   return {
     ...session,
     members: session.members.map(item => item.id === id ? { ...item, pending, consumed, cups } : item),
-    events: [{ id: crypto.randomUUID(), memberId: id, name: member.name, color: member.color, action, amount, at: Date.now() }, ...session.events].slice(0, 80),
+    events: [event, ...session.events].slice(0, 80),
   };
 }
 
-export function leaderboard(session) {
+export function leaderboard(session: Session): RankedMember[] {
   const sorted = [...session.members].sort((a, b) => b.consumed - a.consumed || session.members.indexOf(a) - session.members.indexOf(b));
   return sorted.map((member, index) => ({
     ...member,
-    rank: index > 0 && member.consumed === sorted[index - 1].consumed
+    rank: index > 0 && member.consumed === at(sorted, index - 1).consumed
       ? sorted.findIndex(item => item.consumed === member.consumed) + 1 : index + 1,
   }));
 }
 
-export function validateSession(value) {
-  if (!value || value.version !== 1 || typeof value.title !== 'string' || !value.title.trim() || value.title.length > 30 || !Array.isArray(value.members) || value.members.length > 30) return false;
+export function validateSession(value: ExternalValue): value is Session {
+  if (!isSessionShape(value) || value.version !== 1 || typeof value.title !== 'string' || !value.title.trim() || value.title.length > 30 || !Array.isArray(value.members) || value.members.length > 30) return false;
   try {
     if (!Number.isInteger(value.cupSize) || !Number.isInteger(value.round)) return false;
     validInteger(value.cupSize, '每杯数量', 1, 99);
@@ -123,7 +126,7 @@ export function validateSession(value) {
   } catch { return false; }
 }
 
-export function demoSession() {
+export function demoSession(): Session {
   const session = createSession({ title: '周末小聚', demo: true, cupSize: 2, members: [], round: 1 });
   session.members = [
     { id: 'demo-1', name: '阿杰', color: 0, cupSize: 2, pending: 6, consumed: 8, cups: 4 },

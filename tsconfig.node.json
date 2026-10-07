@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.base.json","compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","lib":["ES2022","DOM","DOM.Iterable"],"types":["node"]},"include":["scripts/**/*.ts","tests/**/*.ts","db/**/*.ts","drizzle.config.ts","src/**/*.ts"]}

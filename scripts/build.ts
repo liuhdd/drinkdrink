@@ -1,15 +1,13 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
+import { buildClient } from './client.ts';
 
-// 原有无需构建的文件仍是可编辑的前端源码。 The original buildless files remain the editable frontend sources.
-await mkdir('dist/client', { recursive: true });
+// TypeScript 源码分别生成浏览器和 Worker 的 ESM 输出。 Build separate browser and Worker ESM outputs from TypeScript sources.
+await rm('dist', { recursive: true, force: true });
+await buildClient();
 await mkdir('dist/server', { recursive: true });
 await mkdir('dist/.openai', { recursive: true });
-for (const file of ['index.html', 'app.mjs', 'domain.mjs', 'persistence.mjs', 'device-storage.mjs', 'server-storage.mjs', 'summary.mjs', 'style.css']) {
-  await cp(`dist/${file}`, `dist/client/${file}`);
-}
-await build({ entryPoints: ['server/worker.mjs'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile: 'dist/server/index.js' });
-await rm('dist/server/retention.mjs', { force: true });
+await build({ entryPoints: ['src/server/worker.ts'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile: 'dist/server/index.js' });
 await cp('.openai/hosting.json', 'dist/.openai/hosting.json');
 await cp('drizzle', 'dist/.openai/drizzle', { recursive: true });
 await writeFile('dist/server/wrangler.json', JSON.stringify({

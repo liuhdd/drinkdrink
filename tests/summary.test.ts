@@ -1,12 +1,13 @@
+import { at, field } from '../src/shared/values.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, addMembers, memberAction } from '../dist/domain.mjs';
-import { sessionSummary } from '../dist/summary.mjs';
+import { createSession, addMembers, memberAction } from '../src/shared/domain.ts';
+import { sessionSummary } from '../src/client/summary.ts';
 
 test('分享总结包含所有成员、并列排行、实际杯数与剩余数量，且不修改账本', () => {
   let session = addMembers(createSession({ title: '朋友小聚', cupSize: 3, members: [], round: 1, demo: false }), [{ name: '小林', pending: 7 }, { name: '阿杰', pending: 6 }, { name: '小柚' }], []);
-  session = memberAction(session, session.members[0].id, 'drink', 1);
-  session = memberAction(session, session.members[1].id, 'drink', 1);
+  session = memberAction(session, at(session.members, 0).id, 'drink', 1);
+  session = memberAction(session, at(session.members, 1).id, 'drink', 1);
   const before = structuredClone(session);
   const summary = sessionSummary(session, session.startedAt + 61_000);
   assert.equal(summary.title, '朋友小聚');

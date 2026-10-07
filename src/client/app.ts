@@ -1,7 +1,10 @@
-import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from './domain.mjs?v=20261007-summary';
-import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession, finishSession } from './persistence.mjs?v=20261007-summary';
-import { createDeviceClient, SYNC_KEY } from './server-storage.mjs?v=20261006-server';
-import { createSummaryImage } from './summary.mjs?v=20261007-summary';
+import type { Session, Profile, Ledger, DeviceClient, SummaryImage, ExternalValue, LedgerEvent } from '../shared/types.ts';
+import { at, field, errorSnapshot, requireLedger } from '../shared/values.ts';
+import { element, target, closest } from './elements.ts';
+import { memberAction, leaderboard, addMembers, validInteger, MAX_COUNT } from '../shared/domain.ts';
+import { emptyLedger, restoreLedger, rememberMembers, availableMembers, startNextSession, finishSession } from '../shared/persistence.ts';
+import { createDeviceClient, SYNC_KEY } from './server-storage.ts';
+import { createSummaryImage } from './summary.ts';
 
 const paths = {
   wine: '<path d="M8 3h8l1 6a5 5 0 0 1-10 0l1-6ZM12 14v7m-4 0h8M7.5 8h9"/>',
@@ -25,9 +28,85 @@ const paths = {
   sparkles: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4m-2-2h4"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/>',
 };
-const icon = name => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ''}</svg>`;
-const $ = selector => document.querySelector(selector);
-const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+const icon = (name: string | undefined): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${Object.entries(paths).find(([key]) => key === name)?.[1] || ''}</svg>`;
+const elements = {
+  '#activity-list': element(document, '#activity-list', HTMLElement),
+  '#add-members-dialog': element(document, '#add-members-dialog', HTMLDialogElement),
+  '#add-members-error': element(document, '#add-members-error', HTMLElement),
+  '#add-members-form': element(document, '#add-members-form', HTMLFormElement),
+  '#add-members-submit': element(document, '#add-members-submit', HTMLButtonElement),
+  '#append-member': element(document, '#append-member', HTMLButtonElement),
+  '#color-picker': element(document, '#color-picker', HTMLElement),
+  '#delete-member': element(document, '#delete-member', HTMLButtonElement),
+  '#demo-badge': element(document, '#demo-badge', HTMLElement),
+  '#draft-members': element(document, '#draft-members', HTMLElement),
+  '#end-session-button': element(document, '#end-session-button', HTMLButtonElement),
+  '#end-session-dialog': element(document, '#end-session-dialog', HTMLDialogElement),
+  '#end-session-error': element(document, '#end-session-error', HTMLElement),
+  '#end-session-form': element(document, '#end-session-form', HTMLFormElement),
+  '#end-session-form button[type="submit"]': element(document, '#end-session-form button[type="submit"]', HTMLButtonElement),
+  '#end-session-message': element(document, '#end-session-message', HTMLElement),
+  '#finished-session': element(document, '#finished-session', HTMLElement),
+  '#finished-session-message': element(document, '#finished-session-message', HTMLElement),
+  '#history-count': element(document, '#history-count', HTMLElement),
+  '#history-detail-dialog': element(document, '#history-detail-dialog', HTMLDialogElement),
+  '#history-detail-events': element(document, '#history-detail-events', HTMLElement),
+  '#history-detail-members': element(document, '#history-detail-members', HTMLElement),
+  '#history-detail-meta': element(document, '#history-detail-meta', HTMLElement),
+  '#history-detail-title': element(document, '#history-detail-title', HTMLElement),
+  '#history-list': element(document, '#history-list', HTMLElement),
+  '#history-panel': element(document, '#history-panel', HTMLElement),
+  '#history-summary-button': element(document, '#history-summary-button', HTMLButtonElement),
+  '#keep-members': element(document, '#keep-members', HTMLInputElement),
+  '#leaderboard': element(document, '#leaderboard', HTMLElement),
+  '#ledger-panel': element(document, '#ledger-panel', HTMLElement),
+  '#load-message': element(document, '#load-message', HTMLElement),
+  '#load-notice': element(document, '#load-notice', HTMLElement),
+  '#member-controls': element(document, '#member-controls', HTMLElement),
+  '#member-count': element(document, '#member-count', HTMLElement),
+  '#member-dialog': element(document, '#member-dialog', HTMLDialogElement),
+  '#member-error': element(document, '#member-error', HTMLElement),
+  '#member-form': element(document, '#member-form', HTMLFormElement),
+  '#member-name': element(document, '#member-name', HTMLInputElement),
+  '#member-pending': element(document, '#member-pending', HTMLInputElement),
+  '#members-grid': element(document, '#members-grid', HTMLElement),
+  '#new-session-cup': element(document, '#new-session-cup', HTMLInputElement),
+  '#new-session-name': element(document, '#new-session-name', HTMLInputElement),
+  '#new-session-notice': element(document, '#new-session-notice', HTMLElement),
+  '#ranking-live-label': element(document, '#ranking-live-label', HTMLElement),
+  '#ranking-round': element(document, '#ranking-round', HTMLElement),
+  '#remove-dialog': element(document, '#remove-dialog', HTMLDialogElement),
+  '#remove-form': element(document, '#remove-form', HTMLFormElement),
+  '#remove-message': element(document, '#remove-message', HTMLElement),
+  '#retry-storage': element(document, '#retry-storage', HTMLButtonElement),
+  '#save-status': element(document, '#save-status', HTMLElement),
+  '#session-date': element(document, '#session-date', HTMLElement),
+  '#session-dialog': element(document, '#session-dialog', HTMLDialogElement),
+  '#session-error': element(document, '#session-error', HTMLElement),
+  '#session-form': element(document, '#session-form', HTMLFormElement),
+  '#session-round': element(document, '#session-round', HTMLElement),
+  '#session-title': element(document, '#session-title', HTMLElement),
+  '#settings-dialog': element(document, '#settings-dialog', HTMLDialogElement),
+  '#settings-error': element(document, '#settings-error', HTMLElement),
+  '#settings-finished-hint': element(document, '#settings-finished-hint', HTMLElement),
+  '#settings-form': element(document, '#settings-form', HTMLFormElement),
+  '#settings-name': element(document, '#settings-name', HTMLInputElement),
+  '#settings-step': element(document, '#settings-step', HTMLInputElement),
+  '#summary-dialog': element(document, '#summary-dialog', HTMLDialogElement),
+  '#summary-download': element(document, '#summary-download', HTMLAnchorElement),
+  '#summary-error': element(document, '#summary-error', HTMLElement),
+  '#summary-preview': element(document, '#summary-preview', HTMLImageElement),
+  '#summary-retry': element(document, '#summary-retry', HTMLButtonElement),
+  '#summary-share': element(document, '#summary-share', HTMLButtonElement),
+  '#summary-status': element(document, '#summary-status', HTMLElement),
+  '#toast': element(document, '#toast', HTMLElement),
+  '#undo-button': element(document, '#undo-button', HTMLButtonElement),
+  '#workspace': element(document, '#workspace', HTMLElement),
+  '.brand': element(document, '.brand', HTMLAnchorElement),
+  '.page-heading': element(document, '.page-heading', HTMLElement),
+};
+const $ = <S extends keyof typeof elements>(selector: S): typeof elements[S] => elements[selector];
+const escapeHTML = (value: ExternalValue): string => String(value).replace(/[&<>"']/g, char => Object.entries({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }).find(([key]) => key === char)?.[1] ?? char);
 const colors = [
   { bg: '#f3e1d6', fg: '#8d533b', name: '陶土' },
   { bg: '#ebe5f0', fg: '#6f607d', name: '雾紫' },
@@ -36,39 +115,39 @@ const colors = [
   { bg: '#eee7d6', fg: '#786b48', name: '沙金' },
   { bg: '#efdde1', fg: '#885966', name: '烟粉' },
 ];
-const colorStyle = color => `--avatar-bg:${colors[color]?.bg || colors[0].bg};--avatar-fg:${colors[color]?.fg || colors[0].fg}`;
-const avatar = (member, extra) => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
-const number = value => Number(value).toLocaleString('zh-CN');
+const colorStyle = (color: number): string => `--avatar-bg:${colors[color]?.bg || at(colors, 0).bg};--avatar-fg:${colors[color]?.fg || at(colors, 0).fg}`;
+const avatar = (member: Pick<Profile, 'name' | 'color'>, extra: string): string => `<span class="avatar ${extra}" style="${colorStyle(member.color)}">${escapeHTML([...member.name][0] || '友')}</span>`;
+const number = (value: number): string => Number(value).toLocaleString('zh-CN');
 let ledger = emptyLedger();
 let session = ledger.session;
 let step = 1;
 let revision = 0;
-let generation = null;
-let deviceClient;
+let generation: string | null = null;
+let deviceClient: DeviceClient | undefined;
 let ledgerEpoch = 0;
 let syncSequence = 0;
 let ready = false;
 let saving = false;
 let view = 'ledger';
-let selectedMemberId = null;
-let snapshots = [];
-let editId = null;
+let selectedMemberId: string | null = null;
+let snapshots: Session[] = [];
+let editId: string | null = null;
 let selectedColor = 0;
 let draftMemberIndex = 0;
-let toastTimer;
-let summaryTarget;
-let summaryImage;
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let summaryTarget: { session: Session; endedAt: number } | null | undefined;
+let summaryImage: (SummaryImage & { url: string; file?: File }) | null | undefined;
 let summarySequence = 0;
 
-function hydrateIcons(root) {
-  root.querySelectorAll('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
+function hydrateIcons(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
 }
 
-function saveStatus(text, error) {
+function saveStatus(text: string, error: boolean) {
   $('#save-status').innerHTML = `${icon(error ? 'info' : 'cloud-check')}<span>${escapeHTML(text)}</span>`;
 }
 
-function applyLedger(value, nextRevision, nextGeneration) {
+function applyLedger(value: Ledger, nextRevision: number, nextGeneration: string | null) {
   ledgerEpoch++;
   ledger = restoreLedger(value);
   session = ledger.session;
@@ -77,12 +156,14 @@ function applyLedger(value, nextRevision, nextGeneration) {
   generation = nextGeneration;
 }
 
-async function saveToServer(value, expectedRevision) {
+async function saveToServer(value: Ledger, expectedRevision: number) {
   try {
+    if (!deviceClient) throw new Error('记录客户端尚未初始化');
     return await deviceClient.save(value, expectedRevision, generation);
-  } catch (error) {
-    if (error.data) {
-      applyLedger(error.data.ledger ?? emptyLedger(), error.data.revision, error.data.generation);
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
+    const conflict = error instanceof Error ? errorSnapshot(error) : null;
+    if (conflict) {
+      applyLedger(conflict.ledger ?? emptyLedger(), conflict.revision, conflict.generation);
       snapshots = [];
       render();
       if ($('#add-members-dialog').open) updateMemberDrafts();
@@ -92,7 +173,7 @@ async function saveToServer(value, expectedRevision) {
   }
 }
 
-async function commit(nextSession, message, undoable, changes) {
+async function commit(nextSession: Session, message: string, undoable: boolean, changes: Partial<Ledger>): Promise<boolean> {
   if (!ready || saving) {
     toast(saving ? '正在保存，请稍等' : '请先重新加载记录', { error: true, undo: false });
     return false;
@@ -110,10 +191,10 @@ async function commit(nextSession, message, undoable, changes) {
   try {
     const data = await saveToServer(next, revision);
     if (undoable) snapshots = [...snapshots, structuredClone(session)].slice(-30);
-    applyLedger(data.ledger, data.revision, data.generation);
-  } catch (error) {
+    applyLedger(requireLedger(data), data.revision, data.generation);
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
     saveStatus('未保存 · 请重试', true);
-    const formError = [...document.querySelectorAll('dialog[open]')].at(-1)?.querySelector('.form-error');
+    const formError = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)?.querySelector('.form-error');
     if (formError) formError.textContent = error.message || '保存失败，请重试';
     toast(error.message || '保存失败，请重试', { error: true, undo: false });
     return false;
@@ -124,7 +205,7 @@ async function commit(nextSession, message, undoable, changes) {
   return true;
 }
 
-function toast(message, { undo, error }) {
+function toast(message: string, { undo, error }: { undo: boolean; error: boolean }) {
   clearTimeout(toastTimer);
   const element = $('#toast');
   element.className = `toast visible${error ? ' error' : ''}`;
@@ -134,7 +215,7 @@ function toast(message, { undo, error }) {
 
 async function undo() {
   if (!snapshots.length || saving) return;
-  const previous = snapshots.at(-1);
+  const previous = at(snapshots, snapshots.length - 1);
   if (await commit(previous, '已撤销上一步', false, {})) {
     snapshots.pop();
     render();
@@ -152,9 +233,9 @@ function render() {
   $('#ranking-live-label').textContent = finished ? '最终结果' : '实时更新';
   $('#end-session-button').hidden = session.demo || finished;
   $('#finished-session').hidden = !finished;
-  if (finished) $('#finished-session-message').textContent = `${dateTime(session.endedAt)} 结束 · 最终记录已保存，可生成分享图或新开一局。`;
-  document.querySelectorAll('[data-open="add-member"]').forEach(button => { button.hidden = finished; });
-  $('#settings-form').querySelectorAll('input, button[type="submit"]').forEach(control => { control.disabled = finished; });
+  if (finished) $('#finished-session-message').textContent = `${dateTime(session.endedAt ?? session.startedAt)} 结束 · 最终记录已保存，可生成分享图或新开一局。`;
+  document.querySelectorAll<HTMLButtonElement>('[data-open="add-member"]').forEach(button => { button.hidden = finished; });
+  $('#settings-form').querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button[type="submit"]').forEach(control => { control.disabled = finished; });
   $('#settings-finished-hint').hidden = !finished;
   $('#member-count').textContent = String(session.members.length).padStart(2, '0');
   if (!session.members.some(member => member.id === selectedMemberId)) selectedMemberId = null;
@@ -177,17 +258,17 @@ function render() {
   renderHistory();
 }
 
-const dateTime = value => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(value);
+const dateTime = (value: number): string => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(value);
 
 function renderHistory() {
-  $('#history-count').textContent = ledger.history.length;
+  $('#history-count').textContent = String(ledger.history.length);
   $('#history-list').innerHTML = ledger.history.length ? ledger.history.map(entry => {
     const total = entry.session.members.reduce((sum, member) => sum + member.consumed, 0);
     return `<button type="button" class="history-row" data-history="${escapeHTML(entry.id)}"><span class="history-info"><strong>${escapeHTML(entry.session.title)}</strong><span>${escapeHTML(dateTime(entry.session.startedAt))} · 第 ${entry.session.round} 局</span><span>${entry.session.members.length} 位酒友 · 已喝 ${number(total)} 个</span></span><span class="history-open">查看${icon('chevron')}</span></button>`;
   }).join('') : '<div class="empty-members"><h3>还没有历史酒局</h3><p>新开一局时，上一局会自动保存到这里。</p><button class="button secondary" data-open="new-session">新开一局</button></div>';
 }
 
-function openHistory(id) {
+function openHistory(id: string) {
   const entry = ledger.history.find(item => item.id === id);
   if (!entry) return;
   $('#history-detail-title').textContent = entry.session.title;
@@ -211,7 +292,7 @@ function clearSummaryImage() {
   $('#summary-share').hidden = true;
 }
 
-async function openSummary(source, endedAt) {
+async function openSummary(source: Session, endedAt: number) {
   summaryTarget = { session: structuredClone(source), endedAt };
   const sequence = ++summarySequence;
   clearSummaryImage();
@@ -234,7 +315,7 @@ async function openSummary(source, endedAt) {
       $('#summary-share').hidden = !navigator.share || !navigator.canShare?.({ files: [summaryImage.file] });
     } catch { /* 仍可下载或长按保存图片。 Download and long-press saving remain available. */ }
     $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
-  } catch (error) {
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
     if (sequence !== summarySequence || !$('#summary-dialog').open) return;
     $('#summary-status').textContent = '图片暂未生成';
     $('#summary-error').textContent = error.message || '图片生成失败，请重试';
@@ -249,7 +330,7 @@ $('#summary-share').addEventListener('click', async () => {
   const button = $('#summary-share');
   button.disabled = true;
   try { await navigator.share({ files: [summaryImage.file], title: `${summaryImage.summary.title} · 酒局总结` }); }
-  catch (error) { if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
+  catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); if (error.name !== 'AbortError') $('#summary-error').textContent = '暂时无法直接分享，请下载或长按保存图片后分享。'; }
   finally { button.disabled = false; }
 });
 
@@ -273,14 +354,14 @@ function renderMemberControls() {
   $('#member-controls').innerHTML = `<div class="selected-member-heading"><h3 class="selected-member-name">${name}</h3><span class="selected-cup-setting">1 杯 = ${cupSize} 个</span><button class="icon-button" data-edit="${id}" aria-label="编辑${name}">${icon('edit')}</button></div><div class="member-operation-buttons"><button class="button member-subtract" data-action="subtract" data-id="${id}" aria-label="给${name}减${step}个酒" ${member.pending < step ? 'disabled' : ''}>−${step}</button><button class="button member-add" data-action="add" data-id="${id}" aria-label="给${name}加${step}个酒" ${member.pending + step > MAX_COUNT ? 'disabled' : ''}>+${step}</button><button class="button member-drink" data-action="drink" data-id="${id}" title="${drinkTitle}" aria-label="${name}喝完一杯，扣减${cupSize}个" ${insufficient || limitReached ? 'disabled' : ''}>${icon('wine')}<span>−${cupSize}</span></button></div>`;
 }
 
-function switchView(nextView) {
+function switchView(nextView: string) {
   if (!['ledger', 'ranking', 'history'].includes(nextView)) return;
   view = nextView;
   $('#ledger-panel').hidden = view !== 'ledger';
   $('#workspace').classList.toggle('ranking-only', view === 'ranking');
   $('#workspace').hidden = !ready || view === 'history';
   $('#history-panel').hidden = !ready || view !== 'history';
-  document.querySelectorAll('[data-view]').forEach(button => {
+  document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(button => {
     const active = button.dataset.view === view;
     button.classList.toggle('active', active);
     if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
@@ -292,40 +373,40 @@ function renderColors() {
 }
 
 function updateMemberDrafts() {
-  const rows = $('#draft-members').querySelectorAll('.member-draft-row');
+  const rows = $('#draft-members').querySelectorAll<HTMLElement>('.member-draft-row');
   $('#append-member').disabled = session.members.length + rows.length >= 30;
   $('#add-members-submit').textContent = `添加 ${rows.length} 位`;
-  rows.forEach(row => { row.querySelector('[data-remove-draft]').disabled = rows.length === 1; });
+  rows.forEach(row => { element(row, '[data-remove-draft]', HTMLButtonElement).disabled = rows.length === 1; });
   renderKnownMembers();
 }
 
 function renderKnownMembers() {
-  const rows = [...$('#draft-members').children];
+  const rows = [...$('#draft-members').querySelectorAll<HTMLElement>('.member-draft-row')];
   const available = availableMembers(ledger.knownMembers, session);
   for (const row of rows) {
     const otherRows = rows.filter(item => item !== row);
     const ids = new Set(otherRows.map(item => item.dataset.knownMemberId).filter(Boolean));
-    const names = new Set(otherRows.map(item => item.querySelector('.draft-name').value.trim().toLowerCase()).filter(Boolean));
+    const names = new Set(otherRows.map(item => element(item, '.draft-name', HTMLInputElement).value.trim().toLowerCase()).filter(Boolean));
     const choices = available.filter(member => !ids.has(member.id) && !names.has(member.name.toLowerCase()));
-    row.querySelector('.draft-options').innerHTML = choices.map(member => `<button type="button" class="draft-option" role="option" data-pick-member="${escapeHTML(member.id)}" aria-selected="${row.dataset.knownMemberId === member.id}"><span aria-hidden="true">${avatar(member, '')}</span><span>${escapeHTML(member.name)}</span></button>`).join('');
-    row.querySelector('[data-toggle-members]').disabled = !choices.length;
+    element(row, '.draft-options', HTMLElement).innerHTML = choices.map(member => `<button type="button" class="draft-option" role="option" data-pick-member="${escapeHTML(member.id)}" aria-selected="${row.dataset.knownMemberId === member.id}"><span aria-hidden="true">${avatar(member, '')}</span><span>${escapeHTML(member.name)}</span></button>`).join('');
+    element(row, '[data-toggle-members]', HTMLButtonElement).disabled = !choices.length;
     if (!choices.length) closeMemberOptions(row);
   }
 }
 
-function closeMemberOptions(onlyRow) {
-  const rows = onlyRow ? [onlyRow] : [...$('#draft-members').children];
+function closeMemberOptions(onlyRow: HTMLElement | null) {
+  const rows = onlyRow ? [onlyRow] : [...$('#draft-members').querySelectorAll<HTMLElement>('.member-draft-row')];
   for (const row of rows) {
-    row.querySelector('.draft-options').hidden = true;
-    row.querySelector('.draft-name').setAttribute('aria-expanded', 'false');
+    element(row, '.draft-options', HTMLElement).hidden = true;
+    element(row, '.draft-name', HTMLInputElement).setAttribute('aria-expanded', 'false');
   }
 }
 
-function openMemberOptions(row) {
+function openMemberOptions(row: HTMLElement) {
   closeMemberOptions(null);
-  const list = row.querySelector('.draft-options');
+  const list = element(row, '.draft-options', HTMLElement);
   if (!list.children.length) return;
-  const field = row.querySelector('.member-name-field').getBoundingClientRect();
+  const field = element(row, '.member-name-field', HTMLElement).getBoundingClientRect();
   const dialog = $('#add-members-dialog').getBoundingClientRect();
   const below = dialog.bottom - field.bottom - 16;
   const above = field.top - dialog.top - 16;
@@ -333,7 +414,7 @@ function openMemberOptions(row) {
   list.dataset.placement = upwards ? 'above' : 'below';
   list.style.maxHeight = `${Math.max(44, Math.min(180, upwards ? above : below))}px`;
   list.hidden = false;
-  row.querySelector('.draft-name').setAttribute('aria-expanded', 'true');
+  element(row, '.draft-name', HTMLInputElement).setAttribute('aria-expanded', 'true');
 }
 
 function appendMemberDraft() {
@@ -356,25 +437,25 @@ function openAddMembers() {
   $('#add-members-dialog').showModal();
 }
 
-function openMember(id) {
+function openMember(id: string) {
   const member = session.members.find(item => item.id === id);
   if (!member) return;
   editId = id;
   selectedColor = member.color;
   $('#member-name').value = member.name;
-  $('#member-pending').value = member.pending;
+  $('#member-pending').value = String(member.pending);
   $('#member-error').textContent = '';
   renderColors();
   $('#member-dialog').showModal();
 }
 
-function openDialog(name) {
+function openDialog(name: string) {
   if (!ready) { toast('请先重新加载记录', { error: true, undo: false }); return; }
   if (session.endedAt !== undefined && ['add-member', 'end-session'].includes(name)) { toast('本局已结束，请新开一局', { error: true, undo: false }); return; }
   if (name === 'add-member') return openAddMembers();
   if (name === 'settings') {
     $('#settings-name').value = session.title;
-    $('#settings-step').value = step;
+    $('#settings-step').value = String(step);
     $('#settings-error').textContent = '';
     $('#settings-dialog').showModal();
   } else if (name === 'end-session') {
@@ -385,7 +466,7 @@ function openDialog(name) {
     $('#end-session-dialog').showModal();
   } else if (name === 'new-session') {
     $('#new-session-name').value = '今晚的酒局';
-    $('#new-session-cup').value = session.cupSize;
+    $('#new-session-cup').value = String(session.cupSize);
     $('#keep-members').checked = !session.demo;
     $('#session-error').textContent = '';
     $('#new-session-notice').textContent = session.endedAt !== undefined ? '本局已保存到历史，不会重复归档。新局重新计数，添加过的酒友仍可快捷选择。' : '当前酒局会自动保存到「历史酒局」（体验酒局除外）。新局重新计数，添加过的酒友仍可快捷选择。';
@@ -394,8 +475,8 @@ function openDialog(name) {
 }
 
 document.addEventListener('click', async event => {
-  if (!event.target.closest('.member-name-field')) closeMemberOptions(null);
-  const button = event.target.closest('button');
+  if (!target(event).closest('.member-name-field')) closeMemberOptions(null);
+  const button = target(event).closest('button');
   if (!button || button.disabled) return;
   if (button.dataset.view) switchView(button.dataset.view);
   if (button.dataset.history) openHistory(button.dataset.history);
@@ -406,81 +487,86 @@ document.addEventListener('click', async event => {
   }
   if (button.hasAttribute('data-retry-storage')) await initialize();
   if (button.hasAttribute('data-toggle-members')) {
-    const row = button.closest('.member-draft-row');
-    if (row.querySelector('.draft-options').hidden) openMemberOptions(row); else closeMemberOptions(null);
+    const row = closest(button, '.member-draft-row', HTMLElement);
+    if (element(row, '.draft-options', HTMLElement).hidden) openMemberOptions(row); else closeMemberOptions(null);
   }
   if (button.dataset.pickMember) {
-    const row = button.closest('.member-draft-row');
+    const row = closest(button, '.member-draft-row', HTMLElement);
     const profile = availableMembers(ledger.knownMembers, session).find(member => member.id === button.dataset.pickMember);
     if (!profile) return;
     row.dataset.knownMemberId = profile.id;
-    row.querySelector('.draft-name').value = profile.name;
-    row.querySelector('.draft-name').focus();
+    element(row, '.draft-name', HTMLInputElement).value = profile.name;
+    element(row, '.draft-name', HTMLInputElement).focus();
     closeMemberOptions(null);
     updateMemberDrafts();
     $('#add-members-error').textContent = '';
   }
   if (button.dataset.open) openDialog(button.dataset.open);
-  if (button.hasAttribute('data-close')) button.closest('dialog').close();
+  if (button.hasAttribute('data-close')) closest(button, 'dialog', HTMLDialogElement).close();
   if (button.hasAttribute('data-undo')) undo();
   if (button.dataset.selectMember) {
     selectedMemberId = button.dataset.selectMember;
     render();
-    $('#members-grid').querySelector(`[data-select-member="${CSS.escape(selectedMemberId)}"]`)?.focus({ preventScroll: true });
+    $('#members-grid').querySelector<HTMLButtonElement>(`[data-select-member="${CSS.escape(selectedMemberId)}"]`)?.focus({ preventScroll: true });
     if (window.matchMedia('(max-width: 720px)').matches) {
       $('#member-controls').scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
     }
   }
   if (button.dataset.edit) openMember(button.dataset.edit);
-  if (button.hasAttribute('data-add-draft')) appendMemberDraft()?.querySelector('.draft-name').focus();
+  if (button.hasAttribute('data-add-draft')) (() => { const row = appendMemberDraft(); if (row) element(row, '.draft-name', HTMLInputElement).focus(); })();
   if (button.hasAttribute('data-remove-draft')) {
-    const row = button.closest('.member-draft-row');
+    const row = closest(button, '.member-draft-row', HTMLElement);
     const adjacent = row.nextElementSibling ?? row.previousElementSibling;
     row.remove();
     updateMemberDrafts();
     $('#add-members-error').textContent = '';
-    (adjacent?.querySelector('.draft-name') ?? $('#append-member')).focus();
+    if (adjacent) element(adjacent, '.draft-name', HTMLInputElement).focus(); else $('#append-member').focus();
   }
-  if (button.dataset.color) { selectedColor = Number(button.dataset.color); renderColors(); $('#color-picker').querySelector(`[data-color="${selectedColor}"]`).focus(); }
+  if (button.dataset.color) { selectedColor = Number(button.dataset.color); renderColors(); $('#color-picker').querySelector<HTMLButtonElement>(`[data-color="${selectedColor}"]`)?.focus(); }
   if (button.dataset.action) {
     try {
-      const member = session.members.find(item => item.id === button.dataset.id);
-      const next = memberAction(session, button.dataset.id, button.dataset.action, step);
+      const id = button.dataset.id;
+      if (!id) throw new TypeError('成员按钮缺少 ID');
+      const member = session.members.find(item => item.id === id);
+      if (!member) throw new Error('没有找到这位成员');
+      const next = memberAction(session, id, button.dataset.action, step);
       const message = button.dataset.action === 'drink' ? `${member.name}喝完一杯，扣减 ${session.cupSize} 个` : `${member.name}待喝${button.dataset.action === 'add' ? '加' : '减'} ${step} 个`;
       await commit(next, message, true, {});
-      $('#member-controls').querySelector(`[data-id="${CSS.escape(button.dataset.id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
-    } catch (error) { toast(error.message, { error: true, undo: false }); }
+      $('#member-controls').querySelector<HTMLButtonElement>(`[data-id="${CSS.escape(id)}"][data-action="${button.dataset.action}"]`)?.focus({ preventScroll: true });
+    } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); toast(error.message, { error: true, undo: false }); }
   }
 });
 
 $('#draft-members').addEventListener('input', event => {
-  if (!event.target.matches('.draft-name')) return;
-  const row = event.target.closest('.member-draft-row');
+  if (!target(event).matches('.draft-name')) return;
+  const row = target(event).closest('.member-draft-row');
+  if (!(row instanceof HTMLElement)) return;
   delete row.dataset.knownMemberId;
-  const profile = availableMembers(ledger.knownMembers, session).find(member => member.name.toLowerCase() === event.target.value.trim().toLowerCase());
+  const profile = availableMembers(ledger.knownMembers, session).find(member => member.name.toLowerCase() === element(row, '.draft-name', HTMLInputElement).value.trim().toLowerCase());
   if (profile) row.dataset.knownMemberId = profile.id;
   renderKnownMembers();
   $('#add-members-error').textContent = '';
 });
 $('#draft-members').addEventListener('focusin', event => {
-  if (event.target.matches('.draft-name')) openMemberOptions(event.target.closest('.member-draft-row'));
-  else if (!event.target.closest('.member-name-field')) closeMemberOptions(null);
+  if (target(event).matches('.draft-name')) openMemberOptions(closest(target(event), '.member-draft-row', HTMLElement));
+  else if (!target(event).closest('.member-name-field')) closeMemberOptions(null);
 });
 $('#draft-members').addEventListener('keydown', event => {
-  const row = event.target.closest('.member-draft-row');
-  if (!row || !event.target.closest('.member-name-field')) return;
-  if (event.key === 'Escape' && !row.querySelector('.draft-options').hidden) {
+  const row = target(event).closest('.member-draft-row');
+  if (!(row instanceof HTMLElement)) return;
+  if (!row || !target(event).closest('.member-name-field')) return;
+  if (event.key === 'Escape' && !element(row, '.draft-options', HTMLElement).hidden) {
     event.preventDefault();
     event.stopPropagation();
-    row.querySelector('.draft-name').focus();
+    element(row, '.draft-name', HTMLInputElement).focus();
     closeMemberOptions(null);
   } else if (event.key === 'Tab') closeMemberOptions(null);
   else if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
     event.preventDefault();
-    const list = row.querySelector('.draft-options');
+    const list = element(row, '.draft-options', HTMLElement);
     if (list.hidden) openMemberOptions(row);
-    const options = [...list.children];
-    const current = options.indexOf(event.target);
+    const options = [...list.querySelectorAll<HTMLButtonElement>('button')];
+    const current = options.findIndex(option => option === target(event));
     const next = current < 0 ? (event.key === 'ArrowDown' ? 0 : options.length - 1) : (current + (event.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length;
     options[next]?.focus();
   }
@@ -493,21 +579,21 @@ $('#color-picker').addEventListener('keydown', event => {
   event.preventDefault();
   selectedColor = (selectedColor + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : colors.length - 1)) % colors.length;
   renderColors();
-  $('#color-picker').querySelector(`[data-color="${selectedColor}"]`).focus();
+  $('#color-picker').querySelector<HTMLButtonElement>(`[data-color="${selectedColor}"]`)?.focus();
 });
 
 $('#add-members-form').addEventListener('submit', async event => {
   event.preventDefault();
   try {
-    const drafts = [...$('#draft-members').querySelectorAll('.member-draft-row')].map(row => ({ name: row.querySelector('.draft-name').value, pending: row.querySelector('.draft-pending').value, knownMemberId: row.dataset.knownMemberId }));
+    const drafts = [...$('#draft-members').querySelectorAll<HTMLElement>('.member-draft-row')].map(row => ({ name: element(row, '.draft-name', HTMLInputElement).value, pending: element(row, '.draft-pending', HTMLInputElement).value, knownMemberId: row.dataset.knownMemberId }));
     const next = addMembers(session, drafts, ledger.knownMembers);
     const added = next.members.slice(session.members.length);
     if (!await commit(next, `已添加 ${drafts.length} 位酒友`, true, { knownMembers: rememberMembers(ledger.knownMembers, added) })) return;
-    selectedMemberId = added[0].id;
+    selectedMemberId = at(added, 0).id;
     render();
     $('#add-members-dialog').close();
     switchView('ledger');
-  } catch (error) { $('#add-members-error').textContent = error.message; }
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#add-members-error').textContent = error.message; }
 });
 
 $('#member-form').addEventListener('submit', async event => {
@@ -523,11 +609,11 @@ $('#member-form').addEventListener('submit', async event => {
     const member = { ...old, name, color: selectedColor, pending, cupSize: session.cupSize };
     const next = { ...session, members: session.members.map(item => item.id === editId ? member : item) };
     selectedMemberId = member.id;
-    if (pending !== old.pending) next.events = [{ id: crypto.randomUUID(), memberId: member.id, name, color: selectedColor, action: 'set', amount: pending, at: Date.now() }, ...session.events].slice(0, 80);
+    if (pending !== old.pending) { const editedEvent: LedgerEvent = { id: crypto.randomUUID(), memberId: member.id, name, color: selectedColor, action: 'set', amount: pending, at: Date.now() }; next.events = [editedEvent, ...session.events].slice(0, 80); }
     if (!await commit(next, `已更新${name}`, true, { knownMembers: rememberMembers(ledger.knownMembers, [member]) })) return;
     $('#member-dialog').close();
     switchView('ledger');
-  } catch (error) { $('#member-error').textContent = error.message; }
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#member-error').textContent = error.message; }
 });
 
 $('#settings-form').addEventListener('submit', async event => {
@@ -539,7 +625,7 @@ $('#settings-form').addEventListener('submit', async event => {
     if (!await commit({ ...session, title }, '酒局设置已保存', false, { step: nextStep })) return;
     snapshots = snapshots.map(snapshot => ({ ...snapshot, title }));
     $('#settings-dialog').close();
-  } catch (error) { $('#settings-error').textContent = error.message; }
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#settings-error').textContent = error.message; }
 });
 
 $('#end-session-form').addEventListener('submit', async event => {
@@ -553,8 +639,9 @@ $('#end-session-form').addEventListener('submit', async event => {
     snapshots = [];
     render();
     $('#end-session-dialog').close();
+    if (session.endedAt === undefined) throw new Error('结束时间未保存');
     openSummary(session, session.endedAt);
-  } catch (error) { $('#end-session-error').textContent = error.message; }
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#end-session-error').textContent = error.message; }
   finally { button.disabled = false; }
 });
 
@@ -572,7 +659,7 @@ $('#session-form').addEventListener('submit', async event => {
     $('#settings-dialog').close();
     $('#session-dialog').close();
     switchView('ledger');
-  } catch (error) { $('#session-error').textContent = error.message; }
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught)); $('#session-error').textContent = error.message; }
 });
 
 $('#delete-member').addEventListener('click', () => {
@@ -592,7 +679,7 @@ $('#remove-form').addEventListener('submit', async event => {
 
 document.querySelectorAll('dialog').forEach(dialog => {
   dialog.addEventListener('click', event => {
-    if (event.target !== dialog) return;
+    if (target(event) !== dialog) return;
     const rect = dialog.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
   });
@@ -603,6 +690,7 @@ async function syncFromServer() {
   const sequence = ++syncSequence;
   const epoch = ledgerEpoch;
   try {
+    if (!deviceClient) throw new Error('记录客户端尚未初始化');
     const data = await deviceClient.load();
     if (sequence !== syncSequence || epoch !== ledgerEpoch || saving || document.querySelector('dialog[open]')) return;
     if (data.revision === revision && data.generation === generation) { saveStatus('服务端已自动保存', false); return; }
@@ -636,16 +724,17 @@ async function initialize() {
   saveStatus('正在加载…', false);
   try {
     deviceClient ??= createDeviceClient({ storage: localStorage, fetch: globalThis.fetch, randomUUID: () => crypto.randomUUID() });
-    const load = () => deviceClient.initialize();
+    const client = deviceClient;
+    const load = () => client.initialize();
     const data = navigator.locks?.request ? await navigator.locks.request('cheers-device-initialize', load) : await load();
-    applyLedger(data.ledger, data.revision, data.generation);
+    applyLedger(requireLedger(data), data.revision, data.generation);
     ready = true;
     snapshots = [];
     render();
     switchView(view);
     $('#load-notice').hidden = true;
     saveStatus('服务端已自动保存', false);
-  } catch (error) {
+  } catch (caught) { const error = caught instanceof Error ? caught : new Error(String(caught));
     ready = false;
     $('#load-message').textContent = error.message || '记录无法加载，请检查网络和浏览器存储权限后重试';
     $('#retry-storage').hidden = false;
@@ -656,18 +745,23 @@ async function initialize() {
 hydrateIcons(document);
 await initialize();
 
+interface Tool { name: string; title: string; description: string; inputSchema: object; annotations: { readOnlyHint: boolean; untrustedContentHint: boolean }; execute(input: ExternalValue): Promise<object>; }
+interface ModelContext { registerTool(tool: Tool, options: { signal: AbortSignal }): Promise<void> | void; }
+function isModelContext(value: ExternalValue): value is ModelContext { return typeof field(value, 'registerTool') === 'function'; }
+const modelContextValue = field(document, 'modelContext');
+const modelContext = isModelContext(modelContextValue) ? modelContextValue : null;
 // 按能力检测注册 WebMCP 工具，与页面共用记账操作。 Feature-detected WebMCP tools share the exact accounting actions used by the UI.
-if (document.modelContext?.registerTool) {
+if (modelContext?.registerTool) {
   const lifecycle = new AbortController();
-  const register = tool => {
-    try { Promise.resolve(document.modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* 提议中的 API 不受支持时，页面仍可使用。 The UI remains available if the proposed API is unsupported. */ }
+  const register = (tool: Tool) => {
+    try { Promise.resolve(modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* 提议中的 API 不受支持时，页面仍可使用。 The UI remains available if the proposed API is unsupported. */ }
   };
   register({
     name: 'read_current_drinking_session', title: '读取本局记账',
     description: 'Read the current session, per-member pending counts, consumed counts, cup sizes and leaderboard. No state changes.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, untrustedContentHint: true },
-    async execute(input) {
+    async execute(input: ExternalValue) {
       if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) throw new Error('请输入空对象');
       if (!ready) throw new Error('记录尚未加载');
       return { title: session.title, round: session.round, demo: session.demo, cupSize: session.cupSize, members: structuredClone(session.members), leaderboard: leaderboard(session) };
@@ -678,13 +772,15 @@ if (document.modelContext?.registerTool) {
     description: 'Add or subtract pending drink units for one existing member, or complete one cup using the current round’s shared cup size. Changes the visible ledger and current-round leaderboard; supports UI undo.',
     inputSchema: { type: 'object', properties: { memberId: { type: 'string' }, action: { type: 'string', enum: ['add', 'subtract', 'drink'] }, quantity: { type: 'integer', minimum: 1, maximum: 99 } }, required: ['memberId', 'action'], additionalProperties: false },
     annotations: { readOnlyHint: false, untrustedContentHint: true },
-    async execute(input) {
-      if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['memberId', 'action', 'quantity'].includes(key)) || typeof input.memberId !== 'string' || !['add', 'subtract', 'drink'].includes(input.action)) throw new Error('记账参数无效');
-      if (input.quantity !== undefined) validInteger(input.quantity, '加减数量', 1, 99);
-      const next = memberAction(session, input.memberId, input.action, input.quantity ?? step);
-      selectedMemberId = input.memberId;
+    async execute(input: ExternalValue) {
+      if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['memberId', 'action', 'quantity'].includes(key)) || typeof field(input, 'memberId') !== 'string' || !['add', 'subtract', 'drink'].includes(String(field(input, 'action')))) throw new Error('记账参数无效');
+      if (field(input, 'quantity') !== undefined) validInteger(field(input, 'quantity'), '加减数量', 1, 99);
+      const next = memberAction(session, String(field(input, 'memberId')), String(field(input, 'action')), validInteger(field(input, 'quantity') ?? step, '加减数量', 1, 99));
+      selectedMemberId = String(field(input, 'memberId'));
       if (!await commit(next, '已完成记账', true, {})) throw new Error('记账未完成，请检查保存状态后重试');
-      return structuredClone(session.members.find(member => member.id === input.memberId));
+      const saved = session.members.find(member => member.id === String(field(input, 'memberId')));
+      if (!saved) throw new Error('没有找到这位成员');
+      return structuredClone(saved);
     },
   });
   window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });

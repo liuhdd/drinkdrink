@@ -1,6 +1,6 @@
 # 微醺账本
 
-原生 HTML、CSS 和 JavaScript 实现的响应式 H5 酒局记账应用，前端无运行时依赖，数据按匿名设备标识持久化到服务端 D1，无需登录。
+原生 HTML、CSS 和 TypeScript 实现的响应式 H5 酒局记账应用，前端无运行时依赖，数据按匿名设备标识持久化到服务端 D1，无需登录。
 
 ## 功能截图
 
@@ -91,10 +91,12 @@ npm run dev
 
 ```sh
 npm test
-node --check dist/app.mjs
-node --check dist/device-storage.mjs
+npm run typecheck
+npm run build
+node --check dist/client/app.mjs
+node --check dist/server/index.js
 ```
 
-前端源文件直接位于 `dist/`。`persistence.mjs` 管理结束、归档与成员，`summary.mjs` 汇总最终计数并绘制 PNG 分享图，`device-storage.mjs` 仅用于读取旧备份，`server-storage.mjs` 管理设备标识、API 读写与迁移。`server/worker.mjs` 提供 API 及定时清理，`server/retention.mjs` 管理 30 天保留规则。
+源码位于 `src/`：`client/` 管理页面、浏览器存储和分享图，`shared/` 管理账本模型、业务转换和外部数据解析，`server/` 提供 API 与 30 天清理。脚本与测试使用 TypeScript，Node.js 通过显式类型剥离参数运行；`npm run typecheck` 分别检查浏览器、Worker 和 Node 环境。`dist/` 为构建输出，不直接编辑。本地服务启动时构建客户端，并监听 TypeScript 源码更新。使用 `LEDGER_DATA_DIR` 可指定独立的本地数据目录。
 
 `npm run build` 生成 `dist/client`、`dist/server` 和部署元数据，保留已部署的 `0000` 数据库迁移，新增 `device_ledgers` 表及清理索引。`.openai/hosting.json` 绑定 D1 `DB`，Worker 配置每小时整点执行 `scheduled`。线上使用 Sites 现有公开访问权限，不需要登录。

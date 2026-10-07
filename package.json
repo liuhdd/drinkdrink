@@ -3,14 +3,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "build": "node scripts/build.mjs",
-    "test": "node --test tests/*.test.mjs",
-    "db:generate": "drizzle-kit generate"
+    "dev": "node --experimental-strip-types scripts/dev.ts",
+    "build": "node --experimental-strip-types scripts/build.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "typecheck": "tsc -p tsconfig.client.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261007.1",
+    "@types/node": "22.20.5",
     "drizzle-kit": "0.31.10",
     "drizzle-orm": "0.45.2",
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

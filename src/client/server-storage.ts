@@ -1,39 +1,37 @@
-import { emptyLedger, restoreLedger } from './persistence.mjs';
-import { loadDeviceLedger, STORAGE_KEY, LEGACY_STORAGE_KEY } from './device-storage.mjs';
+import { decodeSnapshot } from '../shared/protocol.ts';
+import type { ExternalValue, DeviceOptions, DeviceClient, Snapshot, Ledger, SaveRequest } from '../shared/types.ts';
+import { field, errorSnapshot } from '../shared/values.ts';
+import { emptyLedger, restoreLedger } from '../shared/persistence.ts';
+import { loadDeviceLedger, STORAGE_KEY, LEGACY_STORAGE_KEY } from './device-storage.ts';
 
 export const DEVICE_KEY = 'cheers-device-id-v1';
 export const MIGRATION_KEY = 'cheers-server-migrated-v1';
 export const SYNC_KEY = 'cheers-server-sync-v1';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createDeviceClient({ storage, fetch: request, randomUUID }) {
-  let deviceId;
+export function createDeviceClient({ storage, fetch: request, randomUUID }: DeviceOptions): DeviceClient {
+  let deviceId: string | undefined;
   const identify = () => {
     if (deviceId) return deviceId;
     const storedId = storage.getItem(DEVICE_KEY);
-    const nextId = uuid.test(storedId ?? '') ? storedId : randomUUID();
+    const nextId = storedId !== null && uuid.test(storedId) ? storedId : randomUUID();
     if (nextId !== storedId) storage.setItem(DEVICE_KEY, nextId);
     deviceId = nextId;
     return deviceId;
   };
-  const decode = data => {
-    if (!Number.isSafeInteger(data?.revision) || data.revision < 0 || (data.revision > 0 && (!data.ledger || !uuid.test(data.generation ?? ''))) || (data.revision === 0 && (data.ledger !== null || data.generation !== null))) throw new Error('服务端返回的记录无效，请重试');
-    return { ledger: data.ledger === null ? null : restoreLedger(data.ledger), revision: data.revision, generation: data.generation };
-  };
-  const call = async (method, body) => {
-    let response;
+  const call = async (method: string, body: SaveRequest | undefined): Promise<Snapshot> => {
+    let response: Response;
     try {
       response = await request('/api/ledger', { method, cache: 'no-store', credentials: 'same-origin',
         headers: { 'X-Device-ID': identify(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(15000) });
     } catch { throw new Error('无法连接记录服务，输入已保留，请检查网络后重试'); }
-    const data = await response.json();
+    const data: ExternalValue = await response.json();
     if (!response.ok) {
-      const error = new Error(data.error || '服务端保存失败，请重试');
-      if (response.status === 409) error.data = decode(data);
+      const error = Object.assign(new Error(String(field(data, 'error') || '服务端保存失败，请重试')), { data: response.status === 409 ? decodeSnapshot(data) : null });
       throw error;
     }
-    return decode(data);
+    return decodeSnapshot(data);
   };
   const finishMigration = () => {
     // 本地清理失败不能将成功的服务端保存报告为失败。 A successful server write must not be reported as failed if local housekeeping fails.
@@ -43,7 +41,7 @@ export function createDeviceClient({ storage, fetch: request, randomUUID }) {
       storage.removeItem(LEGACY_STORAGE_KEY);
     } catch { /* 浏览器存储只读时保留本地备份。 Keep a local backup when browser storage is read-only. */ }
   };
-  const save = async (ledger, revision, generation) => {
+  const save = async (ledger: Ledger, revision: number, generation: string | null): Promise<Snapshot> => {
     const data = await call('PUT', { ledger: restoreLedger(ledger), revision, generation });
     finishMigration();
     try { storage.setItem(SYNC_KEY, randomUUID()); } catch { /* 重新聚焦时的同步也会检查服务端。 Focus synchronization also checks the server. */ }
@@ -56,7 +54,7 @@ export function createDeviceClient({ storage, fetch: request, randomUUID }) {
       if (!data.ledger) {
         const initial = storage.getItem(MIGRATION_KEY) === identify() ? emptyLedger() : loadDeviceLedger(storage).ledger;
         try { data = await save(initial, 0, null); }
-        catch (error) { if (!error.data?.ledger) throw error; data = error.data; }
+        catch (error) { const conflict = error instanceof Error ? errorSnapshot(error) : null; if (!conflict?.ledger) throw error; data = conflict; }
       }
       finishMigration();
       return data;

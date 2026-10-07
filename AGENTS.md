@@ -4,20 +4,16 @@
 
 ## 项目入口
 
-- 本仓库是「微醺账本」，使用原生 HTML、CSS 和 JavaScript，采用 ESM 和 npm。
-- 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准；修改相关功能前先阅读对应说明，不在本文件重复产品文档。
-- `dist/` 下的 HTML、CSS 和 `.mjs` 是可编辑的前端源文件，不是可清理的构建产物。
-- `dist/domain.mjs`：成员计数、酒局校验和排行榜。
-- `dist/persistence.mjs`：账本恢复、成员名单、结束和归档。
-- `dist/device-storage.mjs`：旧本机账本读取及存储逻辑。
-- `dist/server-storage.mjs`：设备标识、服务端读写及迁移。
-- `dist/summary.mjs`：总结数据及分享图片生成。
-- `dist/app.mjs`、`dist/index.html`、`dist/style.css`：页面交互、结构及样式。
-- `server/worker.mjs`：API 和定时清理；`server/retention.mjs`：保留规则。
+- 本仓库是「微醺账本」，使用原生 HTML、CSS 和 TypeScript，采用 ESM 和 npm。
+- 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准，不在本文件重复产品文档。
+- `src/client/`：页面交互、静态资源、浏览器存储、服务端客户端和总结图片。
+- `src/shared/`：账本类型、成员计数、酒局转换、排行榜和外部数据解析。
+- `src/server/`：Worker API 和数据保留规则。
 - `db/schema.ts`、`drizzle/`：数据库定义及迁移；保留已有部署迁移。
-- `scripts/dev.mjs`、`scripts/build.mjs`：本地服务及构建入口。
-- `dist/client/`、`dist/server/`、`dist/.openai/` 是构建输出，应通过构建生成，不直接编辑。
-- `.local-data/` 是本地运行数据，不提交，也不为验证任务清理其中的用户账本。
+- `scripts/`：TypeScript 构建、本地服务和 SQLite 连接器；`tests/`：TypeScript 测试。
+- `dist/` 全部是构建输出，不直接编辑，不提交。
+- `.local-data/` 是本地运行数据，不提交，不为验证任务清理用户账本；验证服务用 `LEDGER_DATA_DIR` 指向临时目录。
+- 分环境启用严格类型检查；业务模型使用结构化类型，未经验证的值仅可留在解析边界。
 
 ## Context7 文档查询
 
@@ -71,12 +67,13 @@
 
   ```sh
   npm test
-  node --check dist/app.mjs
-  node --check dist/device-storage.mjs
+  npm run typecheck
   npm run build
+  node --check dist/client/app.mjs
+  node --check dist/server/index.js
   ```
 
-- 当前没有配置 lint 或类型检查命令，不把语法检查当成类型检查，也不声称运行了不存在的检查。
+- 当前未配置 lint；类型检查由 `npm run typecheck` 执行，不以构建或语法检查替代。
 - 完成时说明运行的验证及结果，明确未验证或失败的部分。
 
 ## 终端使用

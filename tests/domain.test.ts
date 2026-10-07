@@ -1,43 +1,44 @@
+import { at, field } from '../src/shared/values.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, demoSession, memberAction, leaderboard, validateSession, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../dist/domain.mjs';
+import { createSession, demoSession, memberAction, leaderboard, validateSession, normalizeSessionCupSize, addMembers, MAX_COUNT } from '../src/shared/domain.ts';
 
 test('加酒减酒仅影响该成员的待喝数量，并保留原状态', () => {
   const session = demoSession();
   const added = memberAction(session, 'demo-1', 'add', 4);
-  assert.equal(added.members[0].pending, 10);
-  assert.equal(session.members[0].pending, 6);
+  assert.equal(at(added.members, 0).pending, 10);
+  assert.equal(at(session.members, 0).pending, 6);
   assert.deepEqual(added.members.slice(1), session.members.slice(1));
   const removed = memberAction(added, 'demo-1', 'subtract', 3);
-  assert.equal(removed.members[0].pending, 7);
-  assert.equal(removed.members[0].consumed, 8);
+  assert.equal(at(removed.members, 0).pending, 7);
+  assert.equal(at(removed.members, 0).consumed, 8);
 });
 
 test('喝完一杯采用本局统一杯量，同时更新待喝、已喝与杯数', () => {
   const session = demoSession();
-  session.members[2].cupSize = 3;
+  at(session.members, 2).cupSize = 3;
   const after = memberAction(session, 'demo-3', 'drink', 1);
-  assert.equal(after.members[2].pending, session.members[2].pending - session.cupSize);
-  assert.equal(after.members[2].consumed, session.members[2].consumed + session.cupSize);
-  assert.equal(after.members[2].cups, session.members[2].cups + 1);
-  assert.equal(after.members[2].pending + after.members[2].consumed, session.members[2].pending + session.members[2].consumed);
-  assert.equal(after.events[0].amount, 2);
+  assert.equal(at(after.members, 2).pending, at(session.members, 2).pending - session.cupSize);
+  assert.equal(at(after.members, 2).consumed, at(session.members, 2).consumed + session.cupSize);
+  assert.equal(at(after.members, 2).cups, at(session.members, 2).cups + 1);
+  assert.equal(at(after.members, 2).pending + at(after.members, 2).consumed, at(session.members, 2).pending + at(session.members, 2).consumed);
+  assert.equal(at(after.events, 0).amount, 2);
 });
 
 test('数量不足与溢出操作被拒绝，原状态不受影响', () => {
   const session = demoSession();
   assert.throws(() => memberAction(session, 'demo-4', 'subtract', 3), /不能小于/);
-  session.members[0].pending = 1;
+  at(session.members, 0).pending = 1;
   assert.throws(() => memberAction(session, 'demo-1', 'drink', 1), /不足/);
-  session.members[0].pending = MAX_COUNT;
+  at(session.members, 0).pending = MAX_COUNT;
   assert.throws(() => memberAction(session, 'demo-1', 'add', 1), /上限/);
-  session.members[0].consumed = MAX_COUNT;
+  at(session.members, 0).consumed = MAX_COUNT;
   assert.throws(() => memberAction(session, 'demo-1', 'drink', 1), /上限/);
 });
 
 test('排行榜采用已喝个数，杯数不同仍正确排序，相同分数并列', () => {
   const session = demoSession();
-  session.members[1].consumed = 8;
+  at(session.members, 1).consumed = 8;
   const ranked = leaderboard(session);
   assert.deepEqual(ranked.map(member => member.id), ['demo-1', 'demo-2', 'demo-3', 'demo-4']);
   assert.deepEqual(ranked.map(member => member.rank), [1, 1, 3, 4]);
@@ -52,18 +53,18 @@ test('新开一局清空所有计数与记录，保留成员并应用统一杯�
   assert.equal(fresh.events.length, 0);
   assert.ok(fresh.members.every(member => member.cupSize === 4));
   assert.ok(fresh.members.every(member => member.pending === 0 && member.consumed === 0 && member.cups === 0));
-  assert.equal(old.members[0].consumed, 10);
+  assert.equal(at(old.members, 0).consumed, 10);
 });
 
 test('旧记录杯量统一为本局设置，保留既有计数和操作记录', () => {
   const old = memberAction(demoSession(), 'demo-1', 'drink', 1);
-  old.members[2].cupSize = 3;
-  old.members[3].cupSize = 1;
+  at(old.members, 2).cupSize = 3;
+  at(old.members, 3).cupSize = 1;
   const migrated = normalizeSessionCupSize(old);
   assert.ok(migrated.members.every(member => member.cupSize === old.cupSize));
   assert.deepEqual(migrated.members.map(({ cupSize, ...member }) => member), old.members.map(({ cupSize, ...member }) => member));
   assert.deepEqual(migrated.events, old.events);
-  assert.equal(old.members[2].cupSize, 3);
+  assert.equal(at(old.members, 2).cupSize, 3);
   assert.equal(validateSession(migrated), true);
 });
 
@@ -78,10 +79,10 @@ test('批量添加多个酒友，各自待喝数量独立且使用本局杯量',
   assert.deepEqual(original.members, []);
   assert.equal(validateSession(next), true);
   assert.deepEqual(next.events.map(event => event.amount), [7, 4]);
-  const consumed = memberAction(next, next.members[1].id, 'drink', 1);
-  assert.equal(consumed.members[1].pending, 4);
-  assert.equal(consumed.members[1].consumed, 3);
-  assert.deepEqual(consumed.members[0], next.members[0]);
+  const consumed = memberAction(next, at(next.members, 1).id, 'drink', 1);
+  assert.equal(at(consumed.members, 1).pending, 4);
+  assert.equal(at(consumed.members, 1).consumed, 3);
+  assert.deepEqual(at(consumed.members, 0), at(next.members, 0));
 });
 
 test('批量添加完整验证后才生效，拒绝空昵称、重复昵称和人数超限', () => {
@@ -101,7 +102,7 @@ test('恢复已保存的记账数据，包括直接编辑待喝为零的操作',
   const session = memberAction(demoSession(), 'demo-1', 'drink', 1);
   session.events.unshift({ id: 'edited', memberId: 'demo-1', name: '阿杰', color: 0, action: 'set', amount: 0, at: Date.now() });
   assert.equal(validateSession(JSON.parse(JSON.stringify(session))), true);
-  session.members[0].cupSize = 0;
+  at(session.members, 0).cupSize = 0;
   assert.equal(validateSession(session), false);
   assert.equal(validateSession({ version: 99 }), false);
 });
