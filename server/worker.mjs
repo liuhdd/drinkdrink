@@ -13,7 +13,7 @@ async function pruneRow(db, row, now) {
   if (row.cleanup_at >= now) return;
   const stored = JSON.parse(row.data);
   const kept = retainLedger(stored.ledger, stored.memberSeen, now);
-  // Only a semantic change invalidates open pages. Cleanup never extends device lifetime.
+  // 仅数据内容变化才使已打开页面失效，清理不延长设备寿命。 Only a semantic change invalidates open pages. Cleanup never extends device lifetime.
   const changed = JSON.stringify({ ledger: kept.ledger, memberSeen: kept.memberSeen }) !== row.data;
   await db.prepare('UPDATE device_ledgers SET data = ?, revision = revision + ?, cleanup_at = ? WHERE device_id = ? AND revision = ? AND generation = ?')
     .bind(JSON.stringify({ ledger: kept.ledger, memberSeen: kept.memberSeen }), changed ? 1 : 0, kept.cleanupAt, row.device_id, row.revision, row.generation).run();
@@ -33,7 +33,7 @@ const responseData = row => row ? { ledger: restoreLedger(JSON.parse(row.data).l
 
 export async function cleanupExpired(db, now) {
   await db.prepare('DELETE FROM device_ledgers WHERE updated_at < ?').bind(now - RETENTION_MS).run();
-  // Indexed, bounded batches keep scheduled work within Worker limits.
+  // 使用索引和有界批次，使定时任务符合 Worker 限制。 Indexed, bounded batches keep scheduled work within Worker limits.
   for (let batch = 0; batch < 10; batch++) {
     const { results } = await db.prepare('SELECT device_id, data, revision, generation, updated_at, cleanup_at FROM device_ledgers WHERE cleanup_at < ? LIMIT 100').bind(now).all();
     if (!results.length) break;

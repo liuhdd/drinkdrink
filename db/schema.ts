@@ -1,6 +1,6 @@
 import { integer, sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
 
-// Retain the previously deployed migration and table; anonymous devices use a separate table.
+// 保留已部署的迁移和表，匿名设备使用独立表。 Retain the previously deployed migration and table; anonymous devices use a separate table.
 export const ledgers = sqliteTable('ledgers', {
   userId: text('user_id').primaryKey(),
   data: text('data').notNull(),

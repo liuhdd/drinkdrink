@@ -36,17 +36,17 @@ export function createDeviceClient({ storage, fetch: request, randomUUID }) {
     return decode(data);
   };
   const finishMigration = () => {
-    // A successful server write must not be reported as failed if local housekeeping fails.
+    // 本地清理失败不能将成功的服务端保存报告为失败。 A successful server write must not be reported as failed if local housekeeping fails.
     try {
       storage.setItem(MIGRATION_KEY, identify());
       storage.removeItem(STORAGE_KEY);
       storage.removeItem(LEGACY_STORAGE_KEY);
-    } catch { /* Keep a local backup when browser storage is read-only. */ }
+    } catch { /* 浏览器存储只读时保留本地备份。 Keep a local backup when browser storage is read-only. */ }
   };
   const save = async (ledger, revision, generation) => {
     const data = await call('PUT', { ledger: restoreLedger(ledger), revision, generation });
     finishMigration();
-    try { storage.setItem(SYNC_KEY, randomUUID()); } catch { /* Focus synchronization also checks the server. */ }
+    try { storage.setItem(SYNC_KEY, randomUUID()); } catch { /* 重新聚焦时的同步也会检查服务端。 Focus synchronization also checks the server. */ }
     return data;
   };
   return {

@@ -18,7 +18,7 @@ export function createSession({ title, cupSize, members, round, demo }) {
   };
 }
 
-// Keep the stored v1 member shape compatible while the round owns the cup size.
+// 杯量由酒局统一管理，保留 v1 成员结构兼容性。 Keep the stored v1 member shape compatible while the round owns the cup size.
 export function normalizeSessionCupSize(session) {
   return { ...session, members: session.members.map(member => ({ ...member, cupSize: session.cupSize })) };
 }

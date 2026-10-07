@@ -3,7 +3,7 @@ import { restoreLedger } from '../dist/persistence.mjs';
 
 export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Member last-use timestamps live on the server, outside the browser-editable ledger.
+// 成员最后使用时间存于服务端，不属于浏览器可编辑的账本。 Member last-use timestamps live on the server, outside the browser-editable ledger.
 export function retainLedger(value, memberSeen, now) {
   const ledger = restoreLedger(value);
   const cutoff = now - RETENTION_MS;

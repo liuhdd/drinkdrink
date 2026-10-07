@@ -1,7 +1,7 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 
-// The original buildless files remain the editable frontend sources.
+// 原有无需构建的文件仍是可编辑的前端源码。 The original buildless files remain the editable frontend sources.
 await mkdir('dist/client', { recursive: true });
 await mkdir('dist/server', { recursive: true });
 await mkdir('dist/.openai', { recursive: true });

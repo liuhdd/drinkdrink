@@ -13,7 +13,7 @@ export function sessionSummary(session, endedAt) {
   };
 }
 
-// Draw locally using system fonts; no remote assets or uploads are needed.
+// 使用系统字体在本地绘图，无需远程资源或上传。 Draw locally using system fonts; no remote assets or uploads are needed.
 export async function createSummaryImage(session, endedAt) {
   const summary = sessionSummary(session, endedAt);
   await document.fonts.ready;

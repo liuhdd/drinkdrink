@@ -232,7 +232,7 @@ async function openSummary(source, endedAt) {
     try {
       summaryImage.file = new File([result.blob], result.filename, { type: 'image/png' });
       $('#summary-share').hidden = !navigator.share || !navigator.canShare?.({ files: [summaryImage.file] });
-    } catch { /* Download and long-press saving remain available. */ }
+    } catch { /* 仍可下载或长按保存图片。 Download and long-press saving remain available. */ }
     $('#summary-status').textContent = '图片已生成，可下载或长按保存。';
   } catch (error) {
     if (sequence !== summarySequence || !$('#summary-dialog').open) return;
@@ -656,11 +656,11 @@ async function initialize() {
 hydrateIcons(document);
 await initialize();
 
-// Feature-detected WebMCP tools share the exact accounting actions used by the UI.
+// 按能力检测注册 WebMCP 工具，与页面共用记账操作。 Feature-detected WebMCP tools share the exact accounting actions used by the UI.
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
   const register = tool => {
-    try { Promise.resolve(document.modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* The UI remains available if the proposed API is unsupported. */ }
+    try { Promise.resolve(document.modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* 提议中的 API 不受支持时，页面仍可使用。 The UI remains available if the proposed API is unsupported. */ }
   };
   register({
     name: 'read_current_drinking_session', title: '读取本局记账',
