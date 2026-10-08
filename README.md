@@ -1,6 +1,6 @@
 # 微醺账本
 
-原生 HTML、CSS 和 TypeScript 实现的响应式 H5 酒局记账应用，前端无运行时依赖，数据按匿名设备标识持久化到服务端 D1，无需登录。
+使用 Next.js 16 App Router、React 19、Tailwind CSS 4 和 shadcn/ui 实现的响应式 H5 酒局记账应用。前端静态导出，现有 Worker 提供同源 API，数据按匿名设备标识持久化到 D1，无需登录。
 
 ## 功能截图
 
@@ -83,6 +83,7 @@
 
 ```sh
 cd /Users/liuna/code/drinkdrink/site
+npm ci
 npm run dev
 ```
 
@@ -94,10 +95,14 @@ npm run dev
 npm test
 npm run typecheck
 npm run build
-node --check dist/client/app.mjs
 node --check dist/server/index.js
+npm run test:e2e
 ```
 
-源码位于 `src/`：`client/` 管理页面、浏览器存储和分享图，`shared/` 管理账本模型、业务转换和外部数据解析，`server/` 提供 API 与 30 天清理。脚本与测试使用 TypeScript，Node.js 通过显式类型剥离参数运行；`npm run typecheck` 分别检查浏览器、Worker 和 Node 环境。`dist/` 为构建输出，不直接编辑。本地服务启动时构建客户端，并监听 TypeScript 源码更新。使用 `LEDGER_DATA_DIR` 可指定独立的本地数据目录。
+源码位于 `src/`：`app/` 是 Next.js 页面入口与 Tailwind 主题；`components/` 是 React 页面、表单及 shadcn/ui 组件；`hooks/` 管理存储同步与 WebMCP 生命周期；`client/` 保留浏览器存储连接器和 Canvas 分享图；`shared/` 管理账本模型、业务转换和外部数据解析；`server/` 提供原有 API 与 30 天清理。`components.json` 配置组件别名，样式使用 Tailwind v4 的 PostCSS 插件和 CSS 主题变量。
+
+脚本与测试使用 TypeScript，Node.js 通过显式类型剥离参数运行；`npm run typecheck` 分别检查 Next.js、Worker 和 Node 环境。`.next/`、`out/`、`dist/` 为构建输出，不直接编辑。开发服务使用 Next.js 热更新，同源 API 仍由 Worker 和本地 SQLite 处理。使用 `LEDGER_DATA_DIR` 可指定独立的本地数据目录。
+
+`npm run test:e2e` 使用本机 Google Chrome，启动静态构建产物及独立临时 SQLite，验证完整记账、撤销、归档、PNG 下载、跨页冲突与设备隔离。运行前需安装 Google Chrome 并完成 `npm run build`。生产产物可通过 `npm run preview` 在 `http://127.0.0.1:4173/` 预览（也支持 `PORT` 和 `LEDGER_DATA_DIR`）。
 
 `npm run build` 生成 `dist/client`、`dist/server` 和部署元数据，保留已部署的 `0000` 数据库迁移，新增 `device_ledgers` 表及清理索引。`.openai/hosting.json` 绑定 D1 `DB`，Worker 配置每小时整点执行 `scheduled`。线上使用 Sites 现有公开访问权限，不需要登录。

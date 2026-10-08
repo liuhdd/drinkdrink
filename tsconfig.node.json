@@ -1,1 +1,25 @@
-{"extends":"./tsconfig.base.json","compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","lib":["ES2022","DOM","DOM.Iterable"],"types":["node"]},"include":["scripts/**/*.ts","tests/**/*.ts","db/**/*.ts","drizzle.config.ts","src/**/*.ts"]}
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "db/**/*.ts",
+    "drizzle.config.ts",
+    "playwright.config.ts",
+    "src/shared/**/*.ts",
+    "src/server/**/*.ts",
+    "src/client/**/*.ts"
+  ]
+}

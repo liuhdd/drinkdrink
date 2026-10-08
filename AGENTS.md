@@ -4,14 +4,16 @@
 
 ## 项目入口
 
-- 本仓库是「微醺账本」，使用原生 HTML、CSS 和 TypeScript，采用 ESM 和 npm。
+- 本仓库是「微醺账本」，使用 Next.js App Router、React、Tailwind CSS 和 shadcn/ui，采用严格 TypeScript、ESM 和 npm。
 - 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准，不在本文件重复产品文档。
-- `src/client/`：页面交互、静态资源、浏览器存储、服务端客户端和总结图片。
+- `src/app/`：Next.js 页面入口、元数据和 Tailwind v4 主题；`src/components/`：React 页面与表单，`ui/` 为 shadcn/ui 组件源码。
+- UI 统一使用 shadcn/ui 组件和 Lucide SVG 图标；颜色、圆角通过 `globals.css` 的语义主题统一管理，装饰性图标使用 `aria-hidden`，保留操作入口的稳定 ID 与无障碍名称。
+- `src/hooks/`：React 浏览器连接器、同步与 WebMCP 生命周期；`src/client/`：存储连接器、客户端操作和总结图片。
 - `src/shared/`：账本类型、成员计数、酒局转换、排行榜和外部数据解析。
 - `src/server/`：Worker API 和数据保留规则。
 - `db/schema.ts`、`drizzle/`：数据库定义及迁移；保留已有部署迁移。
-- `scripts/`：TypeScript 构建、本地服务和 SQLite 连接器；`tests/`：TypeScript 测试。
-- `dist/` 全部是构建输出，不直接编辑，不提交。
+- `scripts/`：Next.js 静态导出、Worker 打包、本地开发/预览服务和 SQLite 连接器；`tests/`：TypeScript 测试，`tests/e2e/` 验证真实浏览器与 SQLite。
+- `.next/`、`out/`、`dist/` 全部是构建输出，不直接编辑，不提交；Next.js 静态导出复制至 `dist/client/`，Worker 继续提供 `/api/ledger`。
 - `.local-data/` 是本地运行数据，不提交，不为验证任务清理用户账本；验证服务用 `LEDGER_DATA_DIR` 指向临时目录。
 - 分环境启用严格类型检查；业务模型使用结构化类型，未经验证的值仅可留在解析边界。
 - 失败使用原生错误与具名错误工厂，保留原因、字段路径和请求/响应/SQL 上下文；仅 HTTP/UI 接口将失败转换成响应或可见提示。
@@ -75,10 +77,12 @@
   npm test
   npm run typecheck
   npm run build
-  node --check dist/client/app.mjs
   node --check dist/server/index.js
+  npm run test:e2e
   ```
 
+- 浏览器测试使用本机 Google Chrome，通过临时目录启动生产静态产物与真实 SQLite，绝不使用用户的 `.local-data/`；没有安装 Chrome 时先安装 Google Chrome。
+- 开发服务使用 Next.js 热更新，同源 API 交由原 Worker；生产预览使用 `npm run preview`，必须先构建。
 - 当前未配置 lint；类型检查由 `npm run typecheck` 执行，不以构建或语法检查替代。
 - 完成时说明运行的验证及结果，明确未验证或失败的部分。
 
