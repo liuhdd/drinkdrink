@@ -21,7 +21,7 @@ export async function ledgerServer(t: TestContext) {
   applyMigrations(db);
   let databaseOpen = true;
   const closeDatabase = () => { db.close(); databaseOpen = false; };
-  const env: WorkerEnv = { DB: sqliteAdapter(db), ASSETS: { async fetch() { return new Response(readFileSync(new URL('../src/client/index.html', import.meta.url)), { headers: { 'Content-Type': 'text/html' } }); } } };
+  const env: WorkerEnv = { DB: sqliteAdapter(db), ASSETS: { async fetch() { return new Response('Not found', { status: 404 }); } } };
   const server = createServer(async (incoming, outgoing) => {
     const headers = new Headers();
     for (const [key, value] of Object.entries(incoming.headers)) if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(', ') : value);

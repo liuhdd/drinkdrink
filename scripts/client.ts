@@ -1,11 +1,14 @@
-import { cp, mkdir } from 'node:fs/promises';
-import { build, type BuildOptions } from 'esbuild';
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 
-export function clientBuildOptions(): BuildOptions {
-  return { entryPoints: ['src/client/app.ts'], bundle: true, format: 'esm', platform: 'browser', target: 'es2022', outfile: 'dist/client/app.mjs', sourcemap: true };
-}
+// Next.js 导出静态客户端，部署仍使用原 Worker 与 D1。 Next.js exports the client; deployment keeps the existing Worker and D1.
 export async function buildClient(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build'], { stdio: 'inherit', env: process.env });
+    child.once('error', reject);
+    child.once('exit', code => code === 0 ? resolve() : reject(new Error(`Next.js 构建失败，退出码 ${code}`)));
+  });
+  await rm('dist/client', { recursive: true, force: true });
   await mkdir('dist/client', { recursive: true });
-  for (const file of ['index.html', 'style.css']) await cp(`src/client/${file}`, `dist/client/${file}`);
-  await build(clientBuildOptions());
+  await cp('out', 'dist/client', { recursive: true });
 }
