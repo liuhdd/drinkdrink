@@ -1,0 +1,204 @@
+.scene {
+  position: relative;
+  width: 100%;
+  height: 510px;
+  perspective: 950px;
+  perspective-origin: 50% 45%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.world {
+  position: absolute;
+  top: 320px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: rotateX(-26deg) rotateY(-12deg);
+  transform-style: preserve-3d;
+}
+
+.trayEdge,
+.cupLift,
+.cupMotion,
+.cupPanel,
+.die {
+  position: absolute;
+  transform-style: preserve-3d;
+}
+
+.tray {
+  position: absolute;
+  top: -124px;
+  left: -124px;
+  width: 248px;
+  height: 248px;
+  padding: 12px;
+  border: 1px solid var(--dice-tray-rim);
+  border-radius: 50%;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--dice-tray) 20%, var(--card)), var(--dice-tray-rim) 67%, color-mix(in srgb, var(--dice-tray-rim) 60%, var(--dice-cup-shadow)));
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--dice-tray) 45%, var(--card)), inset 0 0 0 5px color-mix(in srgb, var(--dice-tray-rim) 80%, var(--card));
+  transform: translateY(80px) rotateX(90deg);
+}
+
+.felt {
+  width: 100%;
+  height: 100%;
+  border: 1px solid color-mix(in srgb, var(--dice-tray-rim) 80%, var(--dice-cup-shadow));
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 35% 35%, color-mix(in srgb, var(--dice-tray) 60%, var(--card)), var(--dice-tray));
+  box-shadow: inset 0 1px 8px color-mix(in srgb, var(--dice-cup-shadow) 33%, transparent), inset 0 0 0 3px color-mix(in srgb, var(--dice-tray) 75%, var(--card));
+}
+
+.trayPanel {
+  position: absolute;
+  top: 80px;
+  left: -10px;
+  width: 20px;
+  height: 9px;
+  background: linear-gradient(var(--dice-tray-rim), color-mix(in srgb, var(--dice-tray-rim) 55%, var(--dice-cup-shadow)));
+  transform: rotateY(var(--panel-angle)) translateZ(123px);
+}
+
+.cupShadow {
+  position: absolute;
+  top: -108px;
+  left: -108px;
+  width: 216px;
+  height: 216px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--dice-cup-inside) 21%, transparent) 20%, color-mix(in srgb, var(--dice-cup-inside) 13%, transparent) 48%, transparent 72%);
+  transform: translateY(79.5px) rotateX(90deg);
+}
+
+.cupLift {
+  transform: translateY(calc(-1 * var(--cup-lift)));
+  transition: transform 280ms cubic-bezier(.2, .7, .25, 1);
+}
+
+.scene[data-dragging="true"] .cupLift { transition: none; }
+.scene[data-phase="covering"] .cupLift { transition-duration: 300ms; }
+.scene[data-phase="shaking"] .cupMotion { animation: shake 1200ms ease-in-out both; }
+
+.cupPanel {
+  top: -30px;
+  left: -8.4px;
+  width: 16.8px;
+  height: 110px;
+  transform: rotateY(var(--panel-angle)) translateZ(100px);
+}
+
+.panelExterior,
+.panelInterior {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.panelExterior {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 11%, transparent), transparent 19%, color-mix(in srgb, var(--dice-cup-shadow) 8%, transparent) 70%, color-mix(in srgb, var(--dice-cup-inside) 17%, transparent)), var(--panel-color);
+  box-shadow: inset 0 1px var(--dice-cup-light), inset 0 -4px color-mix(in srgb, var(--dice-cup-inside) 13%, transparent);
+}
+
+.panelInterior {
+  background: linear-gradient(180deg, var(--dice-cup-inside), color-mix(in srgb, var(--dice-cup-inside) 65%, var(--dice-cup-shadow)));
+  transform: rotateY(180deg) translateZ(.5px);
+}
+
+.crownFacet {
+  position: absolute;
+  background: var(--panel-color);
+  clip-path: polygon(var(--facet-inset) 0, calc(100% - var(--facet-inset)) 0, 100% 100%, 0 100%);
+}
+
+.topRing,
+.bottomRing,
+.bottomLip {
+  position: absolute;
+  top: -101px;
+  left: -101px;
+  width: 202px;
+  height: 202px;
+  border: 2px solid color-mix(in srgb, var(--dice-cup-light) 75%, var(--dice-cup));
+  border-radius: 50%;
+  transform: translateY(-29px) rotateX(90deg);
+}
+
+.bottomRing {
+  border-width: 4px;
+  border-color: color-mix(in srgb, var(--dice-cup-light) 85%, var(--dice-cup));
+  transform: translateY(76px) rotateX(90deg);
+}
+
+.bottomLip {
+  width: 204px;
+  height: 204px;
+  top: -102px;
+  left: -102px;
+  border-width: 3px;
+  border-color: var(--dice-cup);
+  transform: translateY(80px) rotateX(90deg);
+}
+
+.die {
+  width: 34px;
+  height: 34px;
+  top: -17px;
+  left: -17px;
+}
+
+.dieFace {
+  position: absolute;
+  inset: 0;
+  padding: 6px;
+  border: 1px solid var(--dice-ivory-shade);
+  border-radius: 5px;
+  backface-visibility: hidden;
+  background: linear-gradient(135deg, var(--dice-ivory), color-mix(in srgb, var(--dice-ivory) 55%, var(--dice-ivory-shade)));
+  box-shadow: inset 0 0 3px var(--card), inset 0 0 0 1px var(--dice-ivory);
+}
+
+.front { transform: translateZ(17px); background: linear-gradient(135deg, color-mix(in srgb, var(--dice-ivory) 85%, var(--dice-ivory-shade)), color-mix(in srgb, var(--dice-ivory) 35%, var(--dice-ivory-shade))); }
+.back { transform: rotateY(180deg) translateZ(17px); }
+.right { transform: rotateY(90deg) translateZ(17px); background: linear-gradient(135deg, color-mix(in srgb, var(--dice-ivory) 55%, var(--dice-ivory-shade)), var(--dice-ivory-shade)); }
+.left { transform: rotateY(-90deg) translateZ(17px); }
+.top { transform: rotateX(90deg) translateZ(17px); }
+.bottom { transform: rotateX(-90deg) translateZ(17px); }
+
+.pips {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 1px;
+  place-items: center;
+}
+
+.pip {
+  grid-row: var(--pip-row);
+  grid-column: var(--pip-column);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--dice-pip);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--foreground) 32%, transparent), 0 .5px var(--card);
+}
+
+.redPips .pip { background: var(--dice-pip-red); box-shadow: inset 0 1px 1px color-mix(in srgb, var(--dice-pip-red) 40%, transparent), 0 .5px var(--card); }
+.pips:has(.pip:only-child) .pip { width: 7px; height: 7px; }
+
+@keyframes shake {
+  0%, 100% { transform: translate3d(0, 0, 0) rotateZ(0deg) rotateX(0deg); }
+  12% { transform: translate3d(-13px, -4px, 4px) rotateZ(-9deg) rotateX(5deg); }
+  25% { transform: translate3d(14px, -9px, -3px) rotateZ(10deg) rotateX(-5deg); }
+  38% { transform: translate3d(-15px, -3px, 3px) rotateZ(-11deg) rotateX(6deg); }
+  51% { transform: translate3d(14px, -10px, -3px) rotateZ(10deg) rotateX(-5deg); }
+  64% { transform: translate3d(-12px, -4px, 3px) rotateZ(-8deg) rotateX(4deg); }
+  77% { transform: translate3d(9px, -5px, -2px) rotateZ(6deg) rotateX(-3deg); }
+  89% { transform: translate3d(-5px, -2px, 1px) rotateZ(-3deg) rotateX(2deg); }
+}
+
+@media (max-width: 380px) {
+  .scene { height: 470px; }
+  .world { top: 285px; transform: scale(.9) rotateX(-26deg) rotateY(-12deg); }
+}

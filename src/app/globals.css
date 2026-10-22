@@ -26,7 +26,19 @@
   --radius-xl: 1.5rem;
   --font-sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
-:root { --background: #f6f4fc; --foreground: #302840; --card: #ffffff; --primary: #7754d6; }
+:root {
+  --background: #f6f4fc; --foreground: #302840; --card: #ffffff; --primary: #7754d6;
+  --dice-cup-light: #d6c3eb;
+  --dice-cup: #b298d0;
+  --dice-cup-shadow: #997db9;
+  --dice-cup-inside: #534067;
+  --dice-tray: #d8cce7;
+  --dice-tray-rim: #cab9e3;
+  --dice-ivory: #fffefa;
+  --dice-ivory-shade: #d9d1c7;
+  --dice-pip: #3b3343;
+  --dice-pip-red: #c54c54;
+}
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground font-sans antialiased; }

@@ -8,6 +8,7 @@
 - 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准，不在本文件重复产品文档。
 - `src/app/`：Next.js 页面入口、元数据和 Tailwind v4 主题；`src/components/`：React 页面与表单，`ui/` 为 shadcn/ui 组件源码。
 - UI 统一使用 shadcn/ui 组件和 Lucide SVG 图标；颜色、圆角通过 `globals.css` 的语义主题统一管理，装饰性图标使用 `aria-hidden`，保留操作入口的稳定 ID 与无障碍名称。
+- 喝酒工具入口位于 `src/components/dice-tool.tsx`；骰盅与骰子使用原生 CSS 3D，手势与摇骰生命周期在 `src/hooks/use-dice.ts`，本地音效在 `src/client/dice-audio.ts`，与账本 API 独立。
 - `src/hooks/`：React 浏览器连接器、同步与 WebMCP 生命周期；`src/client/`：存储连接器、客户端操作和总结图片。
 - `src/shared/`：账本类型、成员计数、酒局转换、排行榜和外部数据解析。
 - `src/server/`：Worker API 和数据保留规则。
