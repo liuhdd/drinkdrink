@@ -8,6 +8,7 @@ import type { ExternalValue, WorkerEnv, LedgerDatabase, DatabaseRow, Snapshot, L
 import { field } from '../shared/values.ts';
 import { restoreLedger } from '../shared/persistence.ts';
 import { RETENTION_MS, retainLedger, prepareLedger } from './retention.ts';
+import { charadesApi } from './charades.ts';
 
 const json = (value: object, status: number): Response => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'X-Device-ID' } });
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -66,6 +67,7 @@ export default {
   async fetch(request: Request, env: WorkerEnv) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (url.pathname === '/api/charades' || url.pathname === '/api/charades/next') return charadesApi(request, env.DB);
     if (url.pathname !== '/api/ledger') return rejected(request, 'HTTP', `接口不存在：${url.pathname}`, 404);
     if (!['GET', 'PUT'].includes(request.method)) return rejected(request, 'HTTP', `不支持请求方法 ${request.method}，请使用 GET 或 PUT`, 405);
     const deviceId = request.headers.get('x-device-id');

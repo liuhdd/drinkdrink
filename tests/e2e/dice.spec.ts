@@ -40,6 +40,7 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   });
   await page.locator('#mobile-tools').click();
   await expect(page.locator('#tools-view')).toBeVisible();
+  await page.locator('#tool-dice').click();
   await expect(page.locator('#dice-shake')).toBeInViewport();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'ready');
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-lift', '0');
@@ -118,6 +119,7 @@ test('离线账本错误时工具仍可用，键盘可揭盖且切换页面会�
   await expect(page.locator('#integration-error')).toBeVisible();
   await page.locator('#mobile-tools').click();
   await expect(page.locator('#tools-view')).toBeVisible();
+  await page.locator('#tool-dice').click();
   await page.locator('#dice-shake').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'settled');
   const gesture = page.locator('#dice-gesture');
@@ -143,11 +145,13 @@ test('离线账本错误时工具仍可用，键盘可揭盖且切换页面会�
   await page.locator('#mobile-ledger').click();
   await expect(page.locator('#dice-scene')).toHaveCount(0);
   await page.locator('#mobile-tools').click();
+  await page.locator('#tool-dice').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'ready');
   await page.locator('#dice-shake').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'settled');
   await page.reload();
   await page.locator('#mobile-tools').click();
+  await page.locator('#tool-dice').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'ready');
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-lift', '0');
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -155,6 +159,7 @@ test('离线账本错误时工具仍可用，键盘可揭盖且切换页面会�
   await page.locator('#nav-ledger').click();
   await page.locator('#nav-tools').click();
   await expect(page.locator('#tools-view')).toBeVisible();
+  await page.locator('#tool-dice').click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
   await page.screenshot({ path: testInfo.outputPath('dice-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 768, height: 1024 });

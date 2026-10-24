@@ -17,3 +17,14 @@ export const deviceLedgers = sqliteTable('device_ledgers', {
   lastRequestId: text('last_request_id'),
   lastRequestHash: text('last_request_hash'),
 }, table => [index('device_ledgers_updated_at_idx').on(table.updatedAt), index('device_ledgers_cleanup_at_idx').on(table.cleanupAt)]);
+
+export const deviceCharades = sqliteTable('device_charades', {
+  deviceId: text('device_id').primaryKey(),
+  questionOrder: text('question_order').notNull(),
+  drawn: integer('drawn').notNull(),
+  round: integer('round').notNull(),
+  revision: integer('revision').notNull(),
+  generation: text('generation').notNull(),
+  lastRequestId: text('last_request_id'),
+  lastRequestHash: text('last_request_hash'),
+});
