@@ -12,7 +12,7 @@ export function CharadesTool({ back }: { back: ReactNode }) {
   const textSize = current && current.question.text.length > 16 ? 'text-2xl sm:text-4xl' : current && current.question.text.length > 8 ? 'text-3xl sm:text-5xl' : 'text-4xl sm:text-6xl';
   return <section id="charades-tool" aria-labelledby="charades-title" className="mx-auto max-w-2xl pb-20 lg:pb-0">
     <Card className="overflow-hidden p-0 sm:p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-5 sm:px-7"><div className="flex items-center gap-2">{back}<div><h2 id="charades-title" tabIndex={-1} className="flex items-center gap-2 text-lg font-semibold outline-none"><Drama aria-hidden="true" className="size-5 text-primary" />你比划我猜</h2><p className="mt-1.5 text-xs text-muted-foreground">面对面描述，让默契接住你的脑洞</p></div></div><span className="rounded-full bg-accent px-3 py-1.5 text-[11px] text-primary">双人 / 多人</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-5 sm:px-7"><div className="flex items-center gap-2">{back}<div><h2 id="charades-title" tabIndex={-1} className="flex items-center gap-2 text-lg font-semibold outline-none"><Drama aria-hidden="true" className="size-5 text-primary" />你比划我猜</h2><p className="mt-1.5 text-xs text-muted-foreground">面对面描述，让默契接住你的脑洞</p></div></div></div>
       <div className="px-5 pb-6 pt-6 sm:px-7 sm:pt-8">
         {current ? <>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 text-xs"><span id="charades-category" className="rounded-full border border-primary/15 bg-accent/50 px-3 py-1.5 text-primary">{current.question.category}</span><span id="charades-progress" data-drawn={current.drawn} data-round={current.round} className="text-muted-foreground">第 {current.round} 轮 · {current.drawn} / {current.total}</span></div>
@@ -24,6 +24,5 @@ export function CharadesTool({ back }: { back: ReactNode }) {
         <div className="mt-6 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(72px+env(safe-area-inset-bottom))] max-lg:z-20 max-lg:border-t max-lg:bg-card/95 max-lg:px-5 max-lg:py-2.5 max-lg:backdrop-blur-xl"><Button id="charades-next" type="button" className="h-12 w-full text-base" disabled={game.busy || !current || game.error !== null} onClick={() => void game.next()}>{game.busy ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : <ArrowRight aria-hidden="true" className="size-5" />}{game.busy ? '正在取题…' : '下一题'}</Button></div>
       </div>
     </Card>
-    <p className="my-6 text-center text-[11px] leading-5 text-muted-foreground">题目进度按本设备保存 · 退出再回来，继续这一题</p>
   </section>;
 }
