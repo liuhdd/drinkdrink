@@ -27,8 +27,7 @@ export function DrinkingTools() {
         <span className="min-w-0 flex-1"><span className="block text-base font-semibold">{tool.name}</span><span className="mt-2 block text-xs font-normal leading-6 text-muted-foreground">{tool.description}</span></span><ArrowRight aria-hidden="true" className="mt-1 size-4 text-primary/60" />
       </Button>)}</div>
     </> : <>
-      <Button id="tools-back" type="button" variant="ghost" className="mb-5 -ml-3 text-muted-foreground" onClick={() => setSelected(null)}><ArrowLeft aria-hidden="true" />全部工具</Button>
-      <selected.component />
+      <selected.component back={<Button id="tools-back" type="button" variant="ghost" size="icon" className="shrink-0 text-muted-foreground" aria-label="全部工具" title="全部工具" onClick={() => setSelected(null)}><ArrowLeft aria-hidden="true" /></Button>} />
     </>}
   </section>;
 }

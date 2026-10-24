@@ -31,7 +31,7 @@ async function expectDiceValues(page: Page, count: number): Promise<void> {
 test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新摇动先盖盅且不写入账本', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.setViewportSize({ width: 320, height: 844 });
+  await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/');
   await expect(page.locator('#workspace')).toBeVisible();
   const ledgerWrites: string[] = [];
@@ -42,6 +42,15 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await expect(page.locator('#tools-view')).toBeVisible();
   await page.locator('#tool-dice').click();
   await expect(page.locator('#dice-shake')).toBeInViewport();
+  for (const viewport of [{ width: 545, height: 563 }, { width: 320, height: 501 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(viewport);
+    const scene = await page.locator('#dice-scene').boundingBox();
+    const shake = await page.locator('#dice-shake').boundingBox();
+    if (!scene || !shake) throw new Error('骰子场景或摇骰按钮没有可用的布局尺寸');
+    expect(scene.y).toBeGreaterThanOrEqual(0);
+    expect(scene.y + scene.height).toBeLessThan(shake.y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+  }
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'ready');
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-lift', '0');
   await expect(page.locator('#dice-count-toggle')).toHaveAttribute('aria-expanded', 'false');
@@ -90,7 +99,11 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-lift', '180');
   await expect(page.locator('#dice-gesture')).toHaveAttribute('aria-valuenow', '100');
   await expectDiceValues(page, 6);
-  await page.screenshot({ path: testInfo.outputPath('dice-open.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('dice-open.png'), fullPage: true, animations: 'disabled' });
+  const scene = await page.locator('#dice-scene').boundingBox();
+  if (!scene) throw new Error('揭盅后的骰子场景没有可用的布局尺寸');
+  const cupTop = await page.locator('#dice-cup').evaluate(cup => Math.min(...Array.from(cup.querySelectorAll('div, i'), part => part.getBoundingClientRect()).filter(bounds => bounds.width > 0 && bounds.height > 0).map(bounds => bounds.top)));
+  expect(cupTop).toBeGreaterThanOrEqual(scene.y);
   await page.locator('#dice-shake').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'covering');
   await expect(page.locator('#dice-result')).toHaveCount(0);
