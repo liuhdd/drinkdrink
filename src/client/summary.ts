@@ -30,7 +30,7 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
   const ctx = canvas.getContext('2d');
   if (!ctx) throw domainError('当前浏览器无法生成图片，请换一个浏览器重试', 'summary');
   const font = '"PingFang SC", "Microsoft YaHei", sans-serif';
-  const ink = '#302840', muted = '#756a84', accent = '#7754d6';
+  const ink = '#30221c', muted = '#78685e', accent = '#bb4200';
   const text = (value: string | number, x: number, y: number, size: number, color: string, weight: number, align: CanvasTextAlign): void => {
     ctx.fillStyle = color;
     ctx.font = `${weight} ${size}px ${font}`;
@@ -38,13 +38,13 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
     ctx.fillText(String(value), x, y);
   };
   const line = (y: number): void => {
-    ctx.strokeStyle = '#e9e3f3'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#eee3d8'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(68, y); ctx.lineTo(1012, y); ctx.stroke();
   };
   const format = (at: number): string => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(at);
-  ctx.fillStyle = '#f6f4fc'; ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#fffaf3'; ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = '#ffffff'; ctx.fillRect(32, 32, width - 64, height - 64);
-  ctx.fillStyle = '#7754d6'; ctx.fillRect(68, 72, 7, 36);
+  ctx.fillStyle = accent; ctx.fillRect(68, 72, 7, 36);
   text('微醺账本', 94, 100, 30, accent, 600, 'left');
   text('酒局总结', 1012, 100, 24, muted, 400, 'right');
   text('相聚有时，回忆有数。', 68, 168, 24, muted, 400, 'left');
@@ -60,7 +60,7 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
   const minutes = Math.floor(summary.durationMs / 60_000);
   const duration = minutes === 0 ? '不足 1 分钟' : minutes < 60 ? `${minutes} 分钟` : `${Math.floor(minutes / 60)} 小时${minutes % 60 ? ` ${minutes % 60} 分钟` : ''}`;
   text(`第 ${summary.round} 局 · 相聚 ${duration} · 1 杯 = ${summary.cupSize} 个`, 68, 384, 23, muted, 400, 'left');
-  ctx.fillStyle = '#ebe4fa'; ctx.fillRect(68, 426, 944, 130);
+  ctx.fillStyle = '#ffecd7'; ctx.fillRect(68, 426, 944, 130);
   const stats: [string, number, string][] = [['酒友', summary.totals.members, '位'], ['已喝', summary.totals.consumed, '个'], ['杯数', summary.totals.cups, '杯'], ['剩余待喝', summary.totals.pending, '个']];
   stats.forEach(([label, value, unit], i) => {
     const center = 186 + i * 236;
@@ -71,7 +71,7 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
   text('已喝 / 杯数', 808, 614, 22, muted, 400, 'right');
   text('待喝', 1012, 614, 22, muted, 400, 'right');
   line(640);
-  const palette = ['#e8ddff', '#eddefa', '#f5dff6', '#e4e7ff', '#ede0f3', '#ebe7f3'];
+  const palette = ['#ffe2c8', '#e0eade', '#deebf8', '#efdef6', '#dbece8', '#ffe4d8'];
   summary.members.forEach((member, i) => {
     const top = 650 + i * 94;
     text(String(member.rank).padStart(2, '0'), 68, top + 54, 23, muted, 400, 'left');
@@ -85,7 +85,7 @@ export async function createSummaryImage(session: Session, endedAt: number): Pro
   });
   if (!summary.members.length) text('这一局，留下一份相聚的纪念。', 68, 714, 26, muted, 400, 'left');
   text('开心碰杯，量力而行。', 68, height - 64, 23, accent, 400, 'left');
-  text('CHEERS, KEEP TRACK.', 1012, height - 64, 20, muted, 400, 'right');
+  text('微醺账本', 1012, height - 64, 20, muted, 400, 'right');
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('图片生成失败，请重试')), 'image/png'));
   const date = new Intl.DateTimeFormat('sv-SE').format(summary.endedAt);
   const title = summary.title.replace(/[\u0000-\u001f\\/:*?"<>|]/g, '_').trim() || '酒局';

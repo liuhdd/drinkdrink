@@ -1,0 +1,53 @@
+{
+  "generator": "built-in image_gen",
+  "assets": [
+    {
+      "file": "avatars/avatar-0.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young East Asian man with short side-swept dark hair, smiling, orange hoodie, pale apricot circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-918e4e0f-1ec1-4b33-a7e4-dd9a6d76b23f.png"
+    },
+    {
+      "file": "avatars/avatar-1.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young East Asian man with short dark hair and round glasses, smiling, muted sage green crewneck top, pale warm gray circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-02822c36-62ca-4f09-8078-2502c4815734.png"
+    },
+    {
+      "file": "avatars/avatar-2.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young East Asian man with dark hair under a light cream baseball cap, smiling, muted blue top, pale sky blue circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-076076ff-2ccb-4b48-b06e-6f1e1406ef08.png"
+    },
+    {
+      "file": "avatars/avatar-3.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young East Asian woman with long dark hair, smiling, muted lilac-purple top, pale lavender circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-36ea5c5f-a769-49d2-b39e-7e08f8f0e6c2.png"
+    },
+    {
+      "file": "avatars/avatar-4.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young adult with short curly dark hair, smiling, muted teal top, pale mint circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-e7153aa6-6a6f-413c-878b-f5d6e77c12ac.png"
+    },
+    {
+      "file": "avatars/avatar-5.webp",
+      "prompt": "Use case: illustration-story. Create ONE original compact decorative UI avatar, isolated square portrait, transparent outside a soft circular color backdrop. Subject: friendly young East Asian woman with a short dark bob haircut, smiling, muted peach top, pale blush circular backdrop. Head and shoulders, three-quarter view looking slightly to the right, centered with comfortable even padding, face fills enough of the square to read at 40px. Match the supplied reference image's friendly softly shaded warm editorial avatar illustration style only; do not render the UI, labels, other people, letters, numbers, badges, logo, or any text. Smooth clean edges, flat matte warm colors, simple expressive face, premium polished app illustration, not photorealistic or glossy 3D. 512px square source. This is an illustration asset, not a screenshot. The reference contributes illustration style and warmth only.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-9d4491f4-130a-4a8c-a50b-335b2573dd1e.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-ca061916-a42d-461a-88de-52cebd473d6e.png"
+    },
+    {
+      "file": "tools/dice.png",
+      "prompt": "Use case: illustration-story. Create ONE original small UI game icon, transparent background, square composition: a warm ivory dice cup tilted open, with exactly three small ivory dice beneath it, orange-red pips on the one faces and dark brown other pips. Soft warm editorial illustration matching the supplied approved cream-orange app reference. Pale apricot subtle ground accent allowed, no large background or shadow. All objects centered and fully inside the canvas with even 8% padding, readable at 72px. Not a UI screenshot, no text, no letters, no logos, no extra objects, no frame. Charming simple painted matte shading, no photographic texture, no glossy 3D.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-a794af08-a283-4570-9736-7d30753303dd.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-897eeb36-6716-499f-98ef-cce66d7fbb7f.png"
+    },
+    {
+      "file": "tools/charades.png",
+      "prompt": "Use case: illustration-story. Create ONE original small UI game icon on genuinely transparent background, square composition: friendly East Asian young man in orange hoodie gesturing expressively and friendly East Asian young woman with long dark hair in lilac-purple top guessing, head and upper torso, small orange question mark over her head. Soft warm editorial illustration matching the supplied approved cream-orange app reference. All figures centered and fully inside the canvas with even 8% padding, readable at 72px. Not a UI screenshot, no text or letters, no logo, no extra people, no frame. Simple expressive faces, painted matte soft shading, no photographic texture, no glossy 3D.",
+      "reference": "/Users/liuna/.codex/generated_images/01a190bf-1342-7c91-9330-ee2f202f5281/exec-a794af08-a283-4570-9736-7d30753303dd.png",
+      "source": "/Users/liuna/.codex/generated_images/01a190d0-ddde-7dc2-b868-4b22027cf048/exec-b55a0607-a8d1-490a-8b6e-517c56acf8e9.png"
+    }
+  ]
+}

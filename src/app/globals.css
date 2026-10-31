@@ -9,45 +9,78 @@
   --color-popover: var(--card);
   --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f0ecf8;
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--foreground);
-  --color-muted: #f3f0fa;
-  --color-muted-foreground: #756a84;
-  --color-accent: #ebe4fa;
-  --color-accent-foreground: var(--primary);
-  --color-destructive: #b13f39;
-  --color-border: #e9e3f3;
-  --color-input: #dcd3ec;
-  --color-ring: var(--primary);
-  --radius-sm: 0.375rem;
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  --radius-lg: 1.25rem;
   --radius-xl: 1.5rem;
-  --font-sans: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-sans: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
 }
+
+/* 奶油橙：暖白底、深棕文字，橙色用于操作与选中状态。 Cream and orange: warm white surfaces, dark brown text, orange actions and selection. */
 :root {
-  --background: #f6f4fc; --foreground: #302840; --card: #ffffff; --primary: #7754d6;
-  --dice-cup-light: #d6c3eb;
-  --dice-cup: #b298d0;
-  --dice-cup-shadow: #997db9;
-  --dice-cup-inside: #534067;
-  --dice-tray: #d8cce7;
-  --dice-tray-rim: #cab9e3;
-  --dice-ivory: #fffefa;
-  --dice-ivory-shade: #d9d1c7;
-  --dice-pip: #3b3343;
-  --dice-pip-red: #c54c54;
+  --background: #fffaf3;
+  --foreground: #30221c;
+  --card: #ffffff;
+  --primary: #bb4200;
+  --primary-foreground: #ffffff;
+  --secondary: #ffecd7;
+  --muted: #f7f0e8;
+  --muted-foreground: #78685e;
+  --accent: #fff0df;
+  --accent-foreground: #30221c;
+  --destructive: #b6322b;
+  --destructive-foreground: #ffffff;
+  --signal: #ef6b1a;
+  --signal-foreground: #30221c;
+  --border: #eee3d8;
+  --input: #dfcdbd;
+  --ring: #bb4200;
+  --shadow-card: 0 8px 28px -16px rgb(87 47 17 / 0.18);
+
+  --dice-cup-light: #ffe0b4;
+  --dice-cup: #eaaa64;
+  --dice-cup-shadow: #bb7337;
+  --dice-cup-inside: #854b23;
+  --dice-tray: #f3d5af;
+  --dice-tray-rim: #dba269;
+  --dice-ivory: #fff9eb;
+  --dice-ivory-shade: #ddc7a5;
+  --dice-pip: #453026;
+  --dice-pip-red: #cc4b00;
 }
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground font-sans antialiased; }
-  body { background-image: radial-gradient(ellipse at 85% 0%, #eee7fc 0, transparent 45%); }
   .lucide { stroke-width: 1.75; }
   button { -webkit-tap-highlight-color: transparent; }
   button:focus-visible { @apply outline-2 outline-offset-4 outline-ring; }
   button:not(:disabled), a { cursor: pointer; }
   input[type="number"] { appearance: textfield; }
+  h1, h2, h3 { letter-spacing: -0.02em; }
+  ::selection { background: var(--secondary); color: var(--foreground); }
+  input, textarea { caret-color: var(--primary); }
+  * { scrollbar-color: var(--input) transparent; scrollbar-width: thin; }
+}
+@media (max-width: 1023px) {
+  /* 游戏详情已有返回标题栏，为矮屏保留手势与按钮空间。 Game details have their own back header; reserve short-screen space for gestures and controls. */
+  [data-slot="tabs"]:has(#dice-tool, #charades-tool) > #app-header { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }

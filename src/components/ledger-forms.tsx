@@ -41,7 +41,7 @@ export function AddMembersForm({ ledger, controller, close }: FormProps) {
     close();
   });
   return <form id="add-members-form" onSubmit={submit} className="grid gap-5">
-    <div id="draft-members" className="grid gap-4">{drafts.map((draft, index) => <div key={draft.id} className="grid gap-3 rounded-xl border bg-background p-4">
+    <div id="draft-members" className="grid gap-3">{drafts.map((draft, index) => <div key={draft.id} className="grid gap-3 rounded-md border border-border bg-background/40 p-4">
       <div className="flex justify-between text-xs text-muted-foreground"><span>酒友 {index + 1}</span>{drafts.length > 1 && <button type="button" aria-label={`移除第 ${index + 1} 行`} data-testid={`remove-draft-${draft.id}`} onClick={() => setDrafts(items => items.filter(item => item.id !== draft.id))}><Trash2 className="size-4" /></button>}</div>
       <Field id={`draft-name-${draft.id}`} label="成员昵称"><Input id={`draft-name-${draft.id}`} autoComplete="off" maxLength={12} required list={`known-members-${draft.id}`} value={draft.name} onChange={event => update(draft.id, 'name', event.target.value)} placeholder="输入或选择以前的酒友" />
         <datalist id={`known-members-${draft.id}`}>{available.filter(profile => !drafts.some(other => other.id !== draft.id && other.name.trim().toLowerCase() === profile.name.toLowerCase())).map(profile => <option key={profile.id} value={profile.name} />)}</datalist>
@@ -99,7 +99,7 @@ export function NewSessionForm({ ledger, controller, close }: FormProps) {
     <Field id="new-session-name" label="酒局名称"><Input id="new-session-name" maxLength={30} required value={name} onChange={event => setName(event.target.value)} /></Field>
     <Field id="new-session-cup" label="一杯算几个（全员统一）"><Input id="new-session-cup" type="number" min={1} max={99} step={1} required value={cup} onChange={event => setCup(event.target.value)} /></Field>
     <div className="flex items-center gap-3"><Checkbox id="keep-members" checked={keep} onCheckedChange={value => setKeep(value === true)} /><Label htmlFor="keep-members">保留本局成员</Label></div>
-    <p className="rounded-xl bg-muted p-4 text-xs leading-6 text-muted-foreground">{ledger.session.endedAt !== undefined ? '上一局已结束并保存。' : '当前酒局会自动保存到历史（体验酒局除外）。'}新局重新计数，添加过的酒友仍可快捷选择。</p>
+    <p className="border border-border bg-secondary/40 p-4 text-xs leading-6 text-muted-foreground">{ledger.session.endedAt !== undefined ? '上一局已结束并保存。' : '当前酒局会自动保存到历史（体验酒局除外）。'}新局重新计数，添加过的酒友仍可快捷选择。</p>
     <FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="confirm-new-session" type="submit" disabled={controller.saving}>确认开启</Button></div>
   </form>;
 }

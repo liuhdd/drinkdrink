@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: '轻松管理酒局成员、加减酒、按杯扣减与单局排行榜。按设备保存，无需登录。',
   icons: { icon: '/icon.svg' },
 };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#f7f6f2' };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#fffaf3' };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return <html lang="zh-CN"><body>{children}</body></html>;
 }

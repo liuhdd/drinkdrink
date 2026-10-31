@@ -8,6 +8,7 @@
 - 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准，不在本文件重复产品文档。
 - `src/app/`：Next.js 页面入口、元数据和 Tailwind v4 主题；`src/components/`：React 页面与表单，`ui/` 为 shadcn/ui 组件源码。
 - UI 统一使用 shadcn/ui 组件和 Lucide SVG 图标；颜色、圆角通过 `globals.css` 的语义主题统一管理，装饰性图标使用 `aria-hidden`，保留操作入口的稳定 ID 与无障碍名称。
+- 当前界面采用奶油橙设计：暖白底、白色圆角卡片、橙色操作与选中状态；成员插画位于 `public/design/avatars/`，按既有头像颜色索引显示并保留昵称首字。工具入口在手机端也固定为两列紧凑卡片，使用 `public/design/tools/` 本地插画，整张卡片为原有操作入口；手机游戏详情只显示自身返回标题栏，为手势区与底部操作保留空间。总结分享图沿用同一配色。
 - 喝酒工具列表入口位于 `src/components/drinking-tools.tsx`；新增工具在此登记图标、名称与界面，界面接收 `back` 导航节点并放入卡片标题栏。骰盅与骰子使用原生 CSS 3D，界面在 `src/components/dice-tool.tsx`，手势与摇骰生命周期在 `src/hooks/use-dice.ts`，本地音效在 `src/client/dice-audio.ts`，与账本 API 独立。
 - 你比划我猜界面、React 连接器和 HTTP 连接器分别在 `src/components/charades-tool.tsx`、`src/hooks/use-charades.ts`、`src/client/charades.ts`；共享协议在 `src/shared/charades.ts`。题库与来源仅放在 `src/server/charades-questions.ts`，不导入浏览器模块。`src/server/charades.ts` 提供 `/api/charades` 与 `/api/charades/next`，独立 `device_charades` 表持久化设备出题进度，不随账本保留期或新酒局重置。下一题沿用设备标识、请求标识与原子版本检查；读取恢复当前题，不推进题目。
 - `src/hooks/`：React 浏览器连接器、同步与 WebMCP 生命周期；`src/client/`：存储连接器、客户端操作和总结图片。

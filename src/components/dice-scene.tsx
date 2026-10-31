@@ -47,7 +47,7 @@ const DIE_POSITIONS: Readonly<Record<number, readonly DiePosition[]>> = {
 };
 
 function materialColor(highlight: number): string {
-  return `color-mix(in srgb, var(--primary), var(--dice-cup-light) ${highlight}%)`;
+  return `color-mix(in srgb, var(--dice-cup), var(--dice-cup-light) ${highlight}%)`;
 }
 
 function panelStyle(angle: number): SceneStyle {
