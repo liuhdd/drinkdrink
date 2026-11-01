@@ -23,10 +23,10 @@ export function LedgerDialog({ state, ledger, controller, close, show, restoreFo
     {state?.kind === 'add' && <AddMembersForm {...props} />}
     {state?.kind === 'edit' && <EditMemberForm {...props} member={state.member} remove={() => show({ kind: 'remove', member: state.member })} />}
     {state?.kind === 'remove' && <RemoveMemberForm {...props} member={state.member} />}
-    {state?.kind === 'settings' && <SettingsForm {...props} start={() => show({ kind: 'new' })} />}
+    {state?.kind === 'settings' && <SettingsForm {...props} start={() => show({ kind: 'new' })} end={() => show({ kind: 'end' })} />}
     {state?.kind === 'new' && <NewSessionForm {...props} />}
     {state?.kind === 'end' && <EndSessionForm {...props} summary={summary} />}
     {state?.kind === 'summary' && <SummaryPreview session={state.session} endedAt={state.endedAt} />}
-    {state?.kind === 'history' && <div className="grid gap-5"><p className="text-xs leading-6 text-muted-foreground">{dateTime(state.archive.session.startedAt)} — {dateTime(state.archive.endedAt)} · 第 {state.archive.session.round} 局 · 1 杯 = {state.archive.session.cupSize} 个</p><h3 className="font-medium">本局排行</h3><Ranking session={state.archive.session} /><h3 className="font-medium">操作记录</h3><Activities events={state.archive.session.events} /><Button id="history-summary-button" type="button" onClick={() => summary(state.archive.session, state.archive.endedAt)}>总结分享图</Button></div>}
+    {state?.kind === 'history' && <div className="grid gap-5"><p className="text-xs leading-6 text-muted-foreground">{dateTime(state.archive.session.startedAt)} — {dateTime(state.archive.endedAt)}</p><h3 className="font-medium">本局排行</h3><Ranking session={state.archive.session} /><h3 className="font-medium">操作记录</h3><Activities events={state.archive.session.events} /><Button id="history-summary-button" type="button" onClick={() => summary(state.archive.session, state.archive.endedAt)}>总结分享图</Button></div>}
   </DialogContent></Dialog>;
 }

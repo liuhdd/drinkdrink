@@ -27,6 +27,20 @@ async function startSession(page: Page, title: string) {
   await expect(page.locator('#session-form')).toHaveCount(0);
   await expect(page.locator('#session-title')).toHaveText(title);
 }
+async function expectCompactSession(page: Page): Promise<void> {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const [header, title, more] = await Promise.all([
+    page.locator('#session-header').boundingBox(), page.locator('#session-title').boundingBox(),
+    page.locator('#desktop-settings').boundingBox(),
+  ]);
+  if (!header || !title || !more) throw new Error('顶部导航、酒局标题或详情入口没有可用的布局尺寸');
+  expect(Math.abs(header.y)).toBeLessThanOrEqual(1);
+  expect(header.height).toBeLessThanOrEqual(64);
+  expect(title.height).toBeLessThanOrEqual(28);
+  expect(more.x).toBeGreaterThanOrEqual(title.x + title.width);
+  expect(Math.abs(title.y + title.height / 2 - more.y - more.height / 2)).toBeLessThanOrEqual(4);
+  await expect(page.locator('#desktop-settings')).toBeInViewport();
+}
 
 test('真实设备账本在 React 中完成批量成员、记账撤销、设置、结束归档与 PNG 下载', async ({ page }, testInfo) => {
   const errors: string[] = [];
@@ -40,7 +54,13 @@ test('真实设备账本在 React 中完成批量成员、记账撤销、设置�
   await expect(page.locator('#add-members-form')).toHaveCount(0);
   await expect(page.locator('#add-members-button')).toBeFocused();
   const rememberedId = await memberId(page, '老酒友');
-  await startSession(page, 'Next 重构验证');
+  await startSession(page, '今晚的酒局'.repeat(6));
+  // 长局名与详情入口合并在单行顶栏，不能额外占用内容空间。 Keep the long session title and details entry in one compact top bar.
+  for (const viewport of [{ width: 319, height: 515 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await expectCompactSession(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+  }
   expect(requireLedger(await snapshot(page)).knownMembers.some(item => item.id === rememberedId)).toBe(true);
   await expect(page.locator('#members-grid [data-select-member]')).toHaveCount(0);
   await page.locator('#add-members-button').click();
@@ -87,6 +107,8 @@ test('真实设备账本在 React 中完成批量成员、记账撤销、设置�
   await page.reload();
   await expect(page.getByTestId(`pending-${id}`)).toHaveText('5');
   await expect(page.locator('#undo-button')).toBeDisabled();
+  await page.locator('#desktop-settings').click();
+  await expect(page.locator('#settings-form')).toBeVisible();
   await page.locator('#end-session-button').click();
   await page.locator('#confirm-end-session').click();
   await expect(page.locator('#summary-preview')).toBeVisible();
@@ -106,6 +128,7 @@ test('真实设备账本在 React 中完成批量成员、记账撤销、设置�
   await expect(page.locator('#finished-session')).toBeVisible();
   await openSettings(page);
   await expect(page.locator('#settings-name')).toBeDisabled();
+  await expect(page.locator('#end-session-button')).toHaveCount(0);
   await page.locator('[data-slot="dialog-close"]').click();
   await page.locator('#mobile-history').click();
   const archive = saved.history[0];

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,7 +66,7 @@ export function EditMemberForm({ ledger, controller, close, member, remove }: Fo
     <FormError message={error} /><div className="flex flex-wrap justify-end gap-2"><Button id="delete-member" type="button" variant="destructive" onClick={remove} disabled={controller.saving}>移除成员</Button><CloseButton close={close} /><Button id="save-member" type="submit" disabled={controller.saving}>保存成员</Button></div>
   </form>;
 }
-export function SettingsForm({ ledger, controller, close, start }: FormProps & { start: () => void }) {
+export function SettingsForm({ ledger, controller, close, start, end }: FormProps & { start: () => void; end: () => void }) {
   const [name, setName] = useState(ledger.session.title);
   const [step, setStep] = useState(String(ledger.step));
   const finished = ledger.session.endedAt !== undefined;
@@ -80,8 +80,8 @@ export function SettingsForm({ ledger, controller, close, start }: FormProps & {
   return <div className="grid gap-6"><form id="settings-form" onSubmit={submit} className="grid gap-5">
     <Field id="settings-name" label="本局名称"><Input id="settings-name" maxLength={30} required value={name} disabled={finished} onChange={event => setName(event.target.value)} /></Field>
     <Field id="settings-step" label="快捷加减数量（个）"><Input id="settings-step" type="number" min={1} max={99} step={1} required value={step} disabled={finished} onChange={event => setStep(event.target.value)} /></Field>
-    <p className="text-xs text-muted-foreground">{finished ? '本局已结束，设置已锁定。新开一局后可继续修改。' : '「＋」「−」每次操作这个数量。'}</p><FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="save-settings" type="submit" disabled={finished || controller.saving}>保存设置</Button></div>
-  </form><div className="border-t pt-5"><Button id="new-session-button" type="button" variant="outline" className="w-full" onClick={start} disabled={controller.saving}><Plus />新开一局</Button></div></div>;
+    {finished && <p className="text-xs text-muted-foreground">本局已结束，设置已锁定。新开一局后可继续修改。</p>}<FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="save-settings" type="submit" disabled={finished || controller.saving}>保存设置</Button></div>
+  </form><div className="grid gap-3 border-t pt-5">{!ledger.session.demo && !finished && <Button id="end-session-button" type="button" variant="outline" className="w-full" onClick={end} disabled={controller.saving}><CheckCircle2 aria-hidden="true" />结束本局</Button>}<Button id="new-session-button" type="button" variant="outline" className="w-full" onClick={start} disabled={controller.saving}><Plus />新开一局</Button></div></div>;
 }
 export function NewSessionForm({ ledger, controller, close }: FormProps) {
   const [name, setName] = useState('今晚的酒局');
@@ -99,7 +99,7 @@ export function NewSessionForm({ ledger, controller, close }: FormProps) {
     <Field id="new-session-name" label="酒局名称"><Input id="new-session-name" maxLength={30} required value={name} onChange={event => setName(event.target.value)} /></Field>
     <Field id="new-session-cup" label="一杯算几个（全员统一）"><Input id="new-session-cup" type="number" min={1} max={99} step={1} required value={cup} onChange={event => setCup(event.target.value)} /></Field>
     <div className="flex items-center gap-3"><Checkbox id="keep-members" checked={keep} onCheckedChange={value => setKeep(value === true)} /><Label htmlFor="keep-members">保留本局成员</Label></div>
-    <p className="border border-border bg-secondary/40 p-4 text-xs leading-6 text-muted-foreground">{ledger.session.endedAt !== undefined ? '上一局已结束并保存。' : '当前酒局会自动保存到历史（体验酒局除外）。'}新局重新计数，添加过的酒友仍可快捷选择。</p>
+    <p className="text-xs text-muted-foreground">新局重新计数。</p>
     <FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="confirm-new-session" type="submit" disabled={controller.saving}>确认开启</Button></div>
   </form>;
 }

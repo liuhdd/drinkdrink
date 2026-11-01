@@ -46,8 +46,7 @@ export function Activities({ events }: { events: readonly LedgerEvent[] }) {
 }
 export function RankingPanel({ session }: { session: Session }) {
   return <section role="complementary" aria-label="单局排行榜">
-    <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">单局排行榜</h2><span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">第 {String(session.round).padStart(2, '0')} 局</span></div>
-    <p className="mt-1.5 mb-4 text-xs text-muted-foreground">按已喝个数排序 · 相同个数并列</p>
+    <h2 className="mb-4 text-xl font-bold">单局排行榜</h2>
     <Ranking session={session} />
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary/70 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><Users aria-hidden="true" className="size-4 text-primary" />{session.members.length} 位酒友</span><span className="text-muted-foreground">合计已喝 <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.consumed, 0)}</strong> 个 · <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.cups, 0)}</strong> 杯</span></div>
   </section>;
