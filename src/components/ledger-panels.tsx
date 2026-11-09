@@ -18,8 +18,8 @@ export function Avatar({ profile }: { profile: Pick<Profile, 'name' | 'color'> }
   return <span aria-hidden="true" data-avatar className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ backgroundColor: color.bg, color: color.fg }}><img src={`/design/avatars/avatar-${profile.color}.webp`} alt="" width={96} height={96} className="size-full object-cover" /><span className="absolute right-0 bottom-0 flex size-4 items-center justify-center rounded-full text-[10px] font-semibold" style={{ backgroundColor: color.bg }}>{[...profile.name][0]}</span></span>;
 }
 export function Members({ session, selectedId, select }: { session: Session; selectedId: string | null; select: (id: string) => void }) {
-  return <div id="members-grid" className="grid gap-2.5" role="group" aria-label="选择酒友">
-    {session.members.length ? session.members.map(member => <button key={member.id} type="button" data-testid={`member-${member.id}`} data-select-member={member.id} aria-pressed={selectedId === member.id} onClick={() => select(member.id)} className={cn('flex w-full items-center justify-between gap-3 rounded-lg border border-transparent bg-card px-4 py-2.5 text-left shadow-[var(--shadow-card)] transition-colors hover:bg-accent focus-visible:outline-offset-2', selectedId === member.id && 'border-primary bg-secondary/65 shadow-none')}>
+  return <div id="members-grid" className="ledger-list" role="group" aria-label="选择酒友">
+    {session.members.length ? session.members.map(member => <button key={member.id} type="button" data-testid={`member-${member.id}`} data-select-member={member.id} aria-pressed={selectedId === member.id} onClick={() => select(member.id)} className={cn('ledger-row flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-offset-[-3px]', selectedId === member.id && 'is-selected')}>
       <span className="flex min-w-0 items-center gap-3"><Avatar profile={member} /><span className="truncate text-base font-semibold">{member.name}</span></span>
       <span className="flex shrink-0 flex-col items-end"><strong className={cn('text-[28px] leading-8 font-semibold tabular-nums', selectedId === member.id && 'text-primary')} data-testid={`pending-${member.id}`}>{member.pending.toLocaleString('zh-CN')}</strong><span className="text-[11px] text-muted-foreground">待喝</span></span>
     </button>) : <div className="py-12 text-center text-sm text-muted-foreground"><Users className="mx-auto mb-3 size-6" /><p>{session.endedAt === undefined ? '还没有酒友' : '这一局没有添加成员'}</p></div>}
@@ -28,16 +28,16 @@ export function Members({ session, selectedId, select }: { session: Session; sel
 export function Ranking({ session }: { session: Session }) {
   const ranked = leaderboard(session);
   const max = ranked[0]?.consumed || 1;
-  return <div id="leaderboard" className="grid gap-2.5">
-    {ranked.length ? ranked.map(member => <div key={member.id} data-testid={`rank-${member.id}`} className={cn('flex items-center gap-2.5 rounded-lg bg-card px-3 py-4 shadow-[var(--shadow-card)] sm:gap-3 sm:px-4', member.consumed > 0 && member.rank === 1 && 'bg-secondary/65')}>
+  return <div id="leaderboard" className="ranking-list">
+    {ranked.length ? ranked.map(member => <div key={member.id} data-testid={`rank-${member.id}`} className={cn('ranking-row flex items-center gap-2.5 px-3 py-4 sm:gap-3 sm:px-4', member.consumed > 0 && member.rank === 1 && 'is-leading')}>
       <span aria-label={`第 ${member.rank} 名`} className={cn('flex w-5 shrink-0 flex-col items-center gap-0.5 text-xs font-semibold tabular-nums text-muted-foreground', member.consumed > 0 && member.rank === 1 && 'text-primary')}>{member.rank === 1 && member.consumed > 0 && <Trophy aria-hidden="true" className="size-4" />}{member.rank}</span>
-      <Avatar profile={member} /><div className="min-w-0 flex-1"><p className="truncate text-base font-semibold">{member.name}</p><p className="mt-1 text-[11px] tabular-nums text-muted-foreground">{member.cups} 杯 · 待喝 {member.pending} 个</p><div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-border/70"><div className="h-full rounded-full bg-signal" style={{ width: `${member.consumed / max * 100}%` }} /></div></div>
+      <Avatar profile={member} /><div className="min-w-0 flex-1"><p className="truncate text-base font-semibold">{member.name}</p><p className="mt-1 text-xs tabular-nums text-muted-foreground"><span>{member.cups} 杯</span><span className="ml-3">待喝 {member.pending} 个</span></p><div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-border/70"><div className="h-full rounded-full bg-signal" style={{ width: `${member.consumed / max * 100}%` }} /></div></div>
       <span className="flex shrink-0 flex-col items-end"><strong className="text-[28px] leading-8 font-semibold tabular-nums text-primary" data-testid={`consumed-${member.id}`}>{member.consumed}</strong><span className="text-[10px] text-muted-foreground">个已喝</span></span>
     </div>) : <p className="py-12 text-center text-sm text-muted-foreground">还没有排行</p>}
   </div>;
 }
 export function Activities({ events }: { events: readonly LedgerEvent[] }) {
-  return <div id="activity-list" className="divide-y divide-border/70 rounded-lg bg-card px-4 shadow-[var(--shadow-card)]">
+  return <div id="activity-list" className="divide-y divide-border border-y border-border px-1">
     {events.length ? events.map(event => <div key={event.id} className="flex items-center gap-2.5 py-3 text-sm [&_[data-avatar]]:size-8 [&_[data-avatar]>span]:hidden">
       <Avatar profile={event} /><div className="min-w-0 flex-1 text-muted-foreground"><strong className="mr-2 break-all font-medium text-foreground">{event.name}</strong>{{ add: '加酒', subtract: '减酒', drink: '喝完一杯，扣减', set: '待喝调整为' }[event.action]} <span className="tabular-nums text-primary">{event.amount} 个</span></div>
       <time className="shrink-0 text-[11px] tabular-nums text-muted-foreground" dateTime={new Date(event.at).toISOString()}>{new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.at)}</time>
@@ -48,7 +48,7 @@ export function RankingPanel({ session }: { session: Session }) {
   return <section role="complementary" aria-label="单局排行榜">
     <h2 className="mb-4 text-xl font-bold">单局排行榜</h2>
     <Ranking session={session} />
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary/70 p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><Users aria-hidden="true" className="size-4 text-primary" />{session.members.length} 位酒友</span><span className="text-muted-foreground">合计已喝 <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.consumed, 0)}</strong> 个 · <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.cups, 0)}</strong> 杯</span></div>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm"><span className="flex items-center gap-2 font-semibold"><Users aria-hidden="true" className="size-4 text-primary" />{session.members.length} 位酒友</span><span className="text-muted-foreground">合计已喝 <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.consumed, 0)}</strong> 个，<strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.cups, 0)}</strong> 杯</span></div>
   </section>;
 }
 export function CloseButton({ close }: { close: () => void }) { return <Button type="button" variant="outline" onClick={close} data-testid="cancel-dialog">取消</Button>; }

@@ -1,3 +1,11 @@
+/* Hallmark · v2.0.0 · genre: playful · scope: app · shape: app screen
+ * surface: absolute white cards, cream canvas
+ * theme: brand (cream and orange) · redesign: polish · built: the project
+ * signature: a shared ledger, continuous rows and a separate action tray
+ * critique: floating cards compete with the pending counts; use rules and one selected row.
+ * 中文：保留品牌、插画和操作，只精修界面。 English: preserve brand, artwork and wiring; refine the surface.
+ */
+/* Hallmark · waive 7b · existing cream and orange brand with white cards · preserve the project card surface and high contrast action text */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -25,8 +33,8 @@
   --color-ring: var(--ring);
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.5rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1rem;
   --font-sans: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
   --font-display: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -51,7 +59,7 @@
   --border: #eee3d8;
   --input: #dfcdbd;
   --ring: #bb4200;
-  --shadow-card: 0 8px 28px -16px rgb(87 47 17 / 0.18);
+  --shadow-card: 0 2px 8px -4px rgb(87 47 17 / 0.12);
 
   --dice-cup-light: #ffe0b4;
   --dice-cup: #eaaa64;
@@ -67,17 +75,29 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
+  html, body { overflow-x: clip; }
   body { @apply bg-background text-foreground font-sans antialiased; }
   .lucide { stroke-width: 1.75; }
   button { -webkit-tap-highlight-color: transparent; }
   button:focus-visible { @apply outline-2 outline-offset-4 outline-ring; }
   button:not(:disabled), a { cursor: pointer; }
   input[type="number"] { appearance: textfield; }
-  h1, h2, h3 { letter-spacing: -0.02em; }
+  h1, h2, h3 { letter-spacing: -0.02em; overflow-wrap: break-word; min-width: 0; text-wrap: balance; }
   ::selection { background: var(--secondary); color: var(--foreground); }
   input, textarea { caret-color: var(--primary); }
   * { scrollbar-color: var(--input) transparent; scrollbar-width: thin; }
 }
+/* 连续账本行替代重复浮动卡片；选中态使用细边与底色。 Continuous ledger rows replace floating cards; a rule and tint mark selection. */
+.ledger-list, .ranking-list { border-block: 1px solid var(--border); }
+.ledger-row, .ranking-row { border-bottom: 1px solid var(--border); background: transparent; }
+.ledger-row:last-child, .ranking-row:last-child { border-bottom: 0; }
+.ledger-row { border-inline-start: 3px solid transparent; }
+.ledger-row:not(.is-selected):hover { background: var(--accent); }
+.ledger-row.is-selected { border-inline-start-color: var(--primary); background: var(--secondary); }
+.ranking-row.is-leading { background: var(--accent); }
+#app-header { border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+#member-controls [data-avatar] { width: 2rem; height: 2rem; }
+#member-controls button:active:not(:disabled) { transform: translateY(1px); }
 @media (max-width: 1023px) {
   /* 游戏详情已有返回标题栏，为矮屏保留手势与按钮空间。 Game details have their own back header; reserve short-screen space for gestures and controls. */
   [data-slot="tabs"]:has(#dice-tool, #charades-tool) > #app-header { display: none; }
