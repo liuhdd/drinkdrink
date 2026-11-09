@@ -1,3 +1,6 @@
+/* Hallmark · checked: 2026-11-09 · scope: app · genre: playful · built: the project · redesign: polish · v2.0.0
+ * 中文：保留现有骰子几何。 English: preserve the existing dice geometry. */
+/* Hallmark · waive 24b · one 6px pip inset is an optical nudge · dice pip geometry preserves the established face spacing */
 .scene {
   position: relative;
   width: 100%;
