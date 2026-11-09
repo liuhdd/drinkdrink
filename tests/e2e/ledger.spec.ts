@@ -135,6 +135,10 @@ test('真实设备账本在 React 中完成批量成员、记账撤销、设置�
   if (!archive) throw new Error('结束后的酒局未归档');
   await page.getByTestId(`history-${archive.id}`).click();
   await expect(page.getByTestId(`consumed-${id}`)).toHaveText('2');
+  // 窄屏历史弹窗不得裁切排行计数。 Narrow history dialogs must not clip ranking counts.
+  await page.setViewportSize({ width: 333, height: 505 });
+  expect(await page.locator('#history-dialog').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#history-summary-button').click();
   await expect(page.locator('#summary-preview')).toBeVisible();
   await page.locator('[data-slot="dialog-close"]').click();
