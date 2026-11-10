@@ -48,7 +48,7 @@ export function SummaryPreview({ session, endedAt }: { session: Session; endedAt
     } finally { setSharing(false); }
   };
   return <div className="grid gap-4">{!image && !error && <p role="status" className="text-xs text-muted-foreground">正在生成图片…</p>}
-    {image && <img id="summary-preview" src={image.url} width={1080} height={770 + Math.max(image.summary.members.length, 1) * 94} alt="酒局总结：局名、起止时间、总计和每位酒友的最终计数" className="h-auto w-full rounded-xl border" />}
+    {image && <img id="summary-preview" src={image.url} width={1080} height={770 + Math.max(image.summary.members.length, 1) * 94} alt="酒局总结：局名、起止时间、总计和每位酒友的最终计数" className="h-auto w-full border" />}
     <FormError message={error} /><div className="flex flex-wrap justify-end gap-2">{error && <Button id="summary-retry" type="button" variant="outline" onClick={() => setAttempt(value => value + 1)}>重新生成</Button>}{image && <Button asChild><a id="summary-download" href={image.url} download={image.filename}><Download />下载图片</a></Button>}{image && canShare && <Button id="summary-share" type="button" variant="outline" disabled={sharing} onClick={() => void share()}><Share2 />分享图片</Button>}</div>
   </div>;
 }

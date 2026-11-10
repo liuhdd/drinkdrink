@@ -31,10 +31,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1rem;
+  --radius-sm: var(--appearance-radius-sm);
+  --radius-md: var(--appearance-radius-md);
+  --radius-lg: var(--appearance-radius-lg);
+  --radius-xl: var(--appearance-radius-xl);
   --font-sans: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
   --font-display: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -60,6 +60,17 @@
   --input: #dfcdbd;
   --ring: #bb4200;
   --shadow-card: 0 2px 8px -4px rgb(87 47 17 / 0.12);
+  --appearance-text-scale: 1;
+  --appearance-button-scale: 1;
+  --appearance-surface-opacity: 100%;
+  --appearance-backdrop-filter: none;
+  --appearance-radius-sm: 0.5rem;
+  --appearance-radius-md: 0.75rem;
+  --appearance-radius-lg: 0.875rem;
+  --appearance-radius-xl: 1rem;
+  --appearance-navigation-height: 72px;
+  --appearance-game-header-height: 69px;
+  --appearance-game-action-height: 69px;
 
   --dice-cup-light: #ffe0b4;
   --dice-cup: #eaaa64;
@@ -73,10 +84,35 @@
   --dice-pip-red: #cc4b00;
 }
 
+/* 仅调整表面底色，不降低文字或三维骰子的透明度。 Change surface backgrounds without fading text or flattening the 3D dice. */
+[data-appearance-surface="card"], [data-appearance-surface="toolbar"], [data-appearance-surface="game"] { --appearance-surface-color: var(--card); --appearance-surface-tint: 1; }
+[data-appearance-surface="toolbar"] { --appearance-surface-tint: 0.95; }
+[data-appearance-surface="selected"] { --appearance-surface-color: var(--secondary); --appearance-surface-tint: 0.65; }
+[data-appearance-surface="secondary"] { --appearance-surface-color: var(--secondary); --appearance-surface-tint: 0.7; }
+[data-appearance-surface="muted"] { --appearance-surface-color: var(--muted); --appearance-surface-tint: 1; }
+[data-appearance-surface="background"] { --appearance-surface-color: var(--background); --appearance-surface-tint: 1; }
+[data-appearance-surface] {
+  background-color: color-mix(in srgb, var(--appearance-surface-color) calc(var(--appearance-surface-opacity) * var(--appearance-surface-tint)), transparent);
+  backdrop-filter: var(--appearance-backdrop-filter);
+}
+/* 毛玻璃独立成层，避免游戏卡片成为底部固定按钮的定位容器。 Layer game blur separately so the card does not contain fixed game controls. */
+[data-appearance-surface="game"] { position: relative; isolation: isolate; backdrop-filter: none; }
+[data-appearance-surface="game"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  backdrop-filter: var(--appearance-backdrop-filter);
+}
+[data-slot="button"], [data-slot="tabs-trigger"], [data-select-member] { --spacing: calc(0.25rem * var(--appearance-button-scale)); }
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   html, body { overflow-x: clip; }
   body { @apply bg-background text-foreground font-sans antialiased; }
+  :where([data-appearance-region], [data-appearance-preview], [data-appearance-editor]) { color: var(--foreground); font-size: var(--text-base); }
   .lucide { stroke-width: 1.75; }
   button { -webkit-tap-highlight-color: transparent; }
   button:focus-visible { @apply outline-2 outline-offset-4 outline-ring; }

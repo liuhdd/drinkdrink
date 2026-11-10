@@ -42,8 +42,8 @@ const DIE_POSITIONS: Readonly<Record<number, readonly DiePosition[]>> = {
   2: [{ x: -30, z: -8, angle: -20 }, { x: 30, z: 10, angle: 18 }],
   3: [{ x: -34, z: -22, angle: -16 }, { x: 34, z: -22, angle: 14 }, { x: 0, z: 34, angle: -7 }],
   4: [{ x: -31, z: -31, angle: -16 }, { x: 31, z: -31, angle: 19 }, { x: -31, z: 31, angle: 12 }, { x: 31, z: 31, angle: -14 }],
-  5: [{ x: -40, z: -38, angle: -13 }, { x: 40, z: -38, angle: 17 }, { x: 0, z: 0, angle: -9 }, { x: -40, z: 38, angle: 14 }, { x: 40, z: 38, angle: -15 }],
-  6: [{ x: -46, z: -28, angle: -12 }, { x: 0, z: -28, angle: 10 }, { x: 46, z: -28, angle: -15 }, { x: -46, z: 28, angle: 13 }, { x: 0, z: 28, angle: -11 }, { x: 46, z: 28, angle: 15 }],
+  5: [{ x: -44, z: -42, angle: -13 }, { x: 44, z: -42, angle: 17 }, { x: 0, z: 0, angle: -9 }, { x: -44, z: 42, angle: 14 }, { x: 44, z: 42, angle: -15 }],
+  6: [{ x: -53, z: -40, angle: -12 }, { x: 0, z: -40, angle: 10 }, { x: 53, z: -40, angle: -15 }, { x: -53, z: 40, angle: 13 }, { x: 0, z: 40, angle: -11 }, { x: 53, z: 40, angle: 15 }],
 };
 
 function materialColor(highlight: number): string {
@@ -61,8 +61,8 @@ function crownFacetStyle(band: number, angle: number): SceneStyle {
   const halfSegment = Math.PI / CROWN_ANGLES.length;
   const lowerRadius = 100 * Math.cos(lowerLatitude);
   const upperRadius = 100 * Math.cos(upperLatitude);
-  const lowerY = -30 - 100 * Math.sin(lowerLatitude);
-  const upperY = -30 - 100 * Math.sin(upperLatitude);
+  const lowerY = 25 - 100 * Math.sin(lowerLatitude);
+  const upperY = 25 - 100 * Math.sin(upperLatitude);
   const lowerZ = lowerRadius * Math.cos(halfSegment);
   const upperZ = upperRadius * Math.cos(halfSegment);
   const tilt = Math.atan2(lowerZ - upperZ, lowerY - upperY);
@@ -79,7 +79,7 @@ function crownFacetStyle(band: number, angle: number): SceneStyle {
 }
 
 function Die({ value, position, index }: { value: DiceValue; position: DiePosition; index: number }) {
-  return <div className={styles.die} aria-hidden="true" data-testid={`dice-${index}`} data-value={value} style={{ transform: `translate3d(${position.x}px, 62px, ${position.z}px) rotateY(${position.angle}deg)` }}>
+  return <div className={styles.die} aria-hidden="true" data-testid={`dice-${index}`} data-value={value} style={{ transform: `translate3d(${position.x}px, 58px, ${position.z}px) rotateY(${position.angle}deg)` }}>
     {FACE_NAMES.map(face => {
       const faceValue = FACE_VALUES[value][face];
       return <div key={face} className={`${styles.dieFace} ${styles[face]}`} data-face={face} data-value={faceValue}>

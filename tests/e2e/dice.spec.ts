@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { expectUnobscuredDice } from './dice-assertions.ts';
 
 test.use({ hasTouch: true });
 
@@ -42,13 +43,14 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await expect(page.locator('#tools-view')).toBeVisible();
   await page.locator('#tool-dice').click();
   await expect(page.locator('#dice-shake')).toBeInViewport();
-  for (const viewport of [{ width: 545, height: 563 }, { width: 320, height: 501 }, { width: 320, height: 568 }]) {
+  for (const viewport of [{ width: 545, height: 563 }, { width: 319, height: 515 }, { width: 320, height: 501 }, { width: 320, height: 568 }]) {
     await page.setViewportSize(viewport);
     const scene = await page.locator('#dice-scene').boundingBox();
     const shake = await page.locator('#dice-shake').boundingBox();
     if (!scene || !shake) throw new Error('骰子场景或摇骰按钮没有可用的布局尺寸');
     expect(scene.y).toBeGreaterThanOrEqual(0);
     expect(scene.y + scene.height).toBeLessThan(shake.y);
+    if (viewport.width === 319 && viewport.height === 515) expect(scene.height).toBeGreaterThanOrEqual(280);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
   }
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'ready');
@@ -60,9 +62,21 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await page.locator('#dice-sound').click();
   await expect(page.locator('#dice-sound')).toHaveAttribute('aria-pressed', 'false');
   await page.locator('#dice-sound').click();
+  const sceneBeforeSettings = await page.locator('#dice-scene').boundingBox();
+  if (!sceneBeforeSettings) throw new Error('打开数量设置前，骰子场景没有可用的布局尺寸');
   await page.locator('#dice-count-toggle').click();
   await expect(page.locator('#dice-count-toggle')).toHaveAttribute('aria-expanded', 'true');
+  const countDialog = page.locator('#dice-count-dialog');
+  await expect(countDialog).toBeVisible();
+  await expect(countDialog).toHaveAttribute('role', 'dialog');
+  await expect(countDialog).toHaveAttribute('aria-modal', 'true');
   await expect(page.locator('#dice-count-settings')).toBeVisible();
+  expect(await page.locator('#dice-scene').boundingBox()).toEqual(sceneBeforeSettings);
+  await page.locator('#dice-count-1').focus();
+  await page.keyboard.press('Shift+Tab');
+  expect(await countDialog.evaluate(dialog => dialog.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#dice-count-1')).toBeFocused();
   await expect(page.locator('#dice-count-5')).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#dice-count-1').click();
   await expect(page.locator('[data-testid^="dice-"]')).toHaveCount(1);
@@ -70,11 +84,17 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await expect(page.locator('#dice-count-6')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-testid^="dice-"]')).toHaveCount(6);
   await expect(page.locator('#dice-count-settings')).toBeVisible();
-  await page.locator('#dice-count-toggle').click();
+  await page.locator('#dice-count-6').press('Escape');
   await expect(page.locator('#dice-count-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(countDialog).toHaveCount(0);
   await expect(page.locator('#dice-count-settings')).toHaveCount(0);
+  await expect(page.locator('#dice-count-toggle')).toBeFocused();
+  expect(await page.locator('#dice-scene').boundingBox()).toEqual(sceneBeforeSettings);
   await page.locator('#dice-count-toggle').click();
   await expect(page.locator('#dice-count-settings')).toBeVisible();
+  await page.locator('#dice-count-done').click();
+  await expect(countDialog).toHaveCount(0);
+  await expect(page.locator('#dice-count-toggle')).toBeFocused();
   await page.locator('#dice-shake').click();
   await expect(page.locator('#dice-scene')).toHaveAttribute('data-phase', 'covering');
   await expect(page.locator('#dice-shake')).toBeDisabled();
@@ -100,6 +120,7 @@ test('真实触屏摇骰子保持盖盅、半揭遮挡与完全揭晓，重新�
   await expect(page.locator('#dice-gesture')).toHaveAttribute('aria-valuenow', '100');
   await expectDiceValues(page, 6);
   await page.screenshot({ path: testInfo.outputPath('dice-open.png'), fullPage: true, animations: 'disabled' });
+  await expectUnobscuredDice(page, 6);
   const scene = await page.locator('#dice-scene').boundingBox();
   if (!scene) throw new Error('揭盅后的骰子场景没有可用的布局尺寸');
   const cupTop = await page.locator('#dice-cup').evaluate(cup => Math.min(...Array.from(cup.querySelectorAll('div, i'), part => part.getBoundingClientRect()).filter(bounds => bounds.width > 0 && bounds.height > 0).map(bounds => bounds.top)));
@@ -127,6 +148,7 @@ test('离线账本错误时工具仍可用，键盘可揭盖且切换页面会�
   await expect(page.locator('#workspace')).toBeVisible();
   await context.setOffline(true);
   await page.locator('#settings-button').click();
+  await page.locator('#settings-session').click();
   await expect(page.locator('#settings-form')).toBeVisible();
   await page.locator('[data-slot="dialog-close"]').click();
   await expect(page.locator('#integration-error')).toBeVisible();
@@ -151,6 +173,7 @@ test('离线账本错误时工具仍可用，键盘可揭盖且切换页面会�
   await context.setOffline(false);
   await expect(page.locator('#integration-error')).toHaveCount(0);
   await page.locator('#settings-button').click();
+  await page.locator('#settings-session').click();
   await expect(page.locator('#settings-form')).toBeVisible();
   await page.locator('[data-slot="dialog-close"]').click();
   await page.locator('#dice-shake').click();
