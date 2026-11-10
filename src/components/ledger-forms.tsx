@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { colors, CloseButton } from './ledger-panels';
+import { colors, CloseButton, dateTime } from './ledger-panels';
 import { addMembers, validInteger } from '@/shared/domain';
 import { availableMembers, rememberMembers, finishSession, startNextSession, withLedgerSession } from '@/shared/persistence';
 import { draftIdentity } from '@/client/actions';
 import { editMember } from '@/client/edit-member';
+import { removeMember } from '@/client/remove-member';
 import { domainError } from '@/shared/errors';
-import type { Ledger, Member, Session } from '@/shared/types';
+import type { Archive, Ledger, Member, Session } from '@/shared/types';
 import type { LedgerController } from '@/hooks/use-ledger';
 
 interface FormProps { ledger: Ledger; controller: LedgerController; close: () => void; }
@@ -60,10 +61,10 @@ export function EditMemberForm({ ledger, controller, close, member, remove }: Fo
     close();
   });
   return <form id="member-form" onSubmit={submit} className="grid gap-5">
-    <Field id="member-name" label="成员昵称"><Input id="member-name" required maxLength={12} value={name} onChange={event => setName(event.target.value)} /></Field>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><Label htmlFor="member-name">成员昵称</Label><Input id="member-name" className="col-span-2 row-start-2" required maxLength={12} value={name} onChange={event => setName(event.target.value)} /><Button id="delete-member" className="col-start-2 row-start-1" type="button" variant="destructive" size="sm" onClick={remove} disabled={controller.saving}><Trash2 aria-hidden="true" />删除酒友</Button></div>
     <fieldset className="grid gap-3"><legend className="mb-3 text-sm font-medium">选择头像颜色</legend><div id="color-picker" className="flex flex-wrap gap-3">{colors.map((item, index) => <label key={item.name} className="relative flex size-9 items-center justify-center rounded-full ring-offset-2 ring-offset-card has-checked:ring-2 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-ring" style={{ backgroundColor: item.bg }}><input className="absolute inset-0 size-full cursor-pointer opacity-0" type="radio" name="color" value={index} aria-label={item.name} checked={color === index} onChange={() => setColor(index)} data-testid={`color-${index}`} />{color === index && <Check aria-hidden="true" className="size-4" style={{ color: item.fg }} />}</label>)}</div></fieldset>
     <Field id="member-pending" label="待喝数量（个）"><Input id="member-pending" type="number" required min={0} max={9999} step={1} value={pending} onChange={event => setPending(event.target.value)} /></Field>
-    <FormError message={error} /><div className="flex flex-wrap justify-end gap-2"><Button id="delete-member" type="button" variant="destructive" onClick={remove} disabled={controller.saving}>移除成员</Button><CloseButton close={close} /><Button id="save-member" type="submit" disabled={controller.saving}>保存成员</Button></div>
+    <FormError message={error} /><div className="flex flex-wrap justify-end gap-2"><CloseButton close={close} /><Button id="save-member" type="submit" disabled={controller.saving}>保存成员</Button></div>
   </form>;
 }
 export function SettingsForm({ ledger, controller, close, start, end }: FormProps & { start: () => void; end: () => void }) {
@@ -84,12 +85,14 @@ export function SettingsForm({ ledger, controller, close, start, end }: FormProp
   </form><div className="grid gap-3 border-t pt-5">{!ledger.session.demo && !finished && <Button id="end-session-button" type="button" variant="outline" className="w-full" onClick={end} disabled={controller.saving}><CheckCircle2 aria-hidden="true" />结束本局</Button>}<Button id="new-session-button" type="button" variant="outline" className="w-full" onClick={start} disabled={controller.saving}><Plus />新开一局</Button></div></div>;
 }
 export function NewSessionForm({ ledger, controller, close }: FormProps) {
+  const [source] = useState({ startedAt: ledger.session.startedAt, round: ledger.session.round });
   const [name, setName] = useState('今晚的酒局');
   const [cup, setCup] = useState(String(ledger.session.cupSize));
   const [keep, setKeep] = useState(!ledger.session.demo);
   const { error, submit } = useFormSubmit(async () => {
     const title = name.trim();
     if (!title) throw domainError('请输入酒局名称', 'new session');
+    if (ledger.session.startedAt !== source.startedAt || ledger.session.round !== source.round) throw domainError('当前酒局已切换，请关闭后重新确认要开启的新局', 'new session');
     const next = startNextSession(ledger, { title, cupSize: validInteger(cup, '每杯数量', 1, 99), members: keep ? ledger.session.members : [] }, Date.now(), crypto.randomUUID());
     await controller.saveLedger(next, '新一局开始了');
     controller.clearUndo();
@@ -99,7 +102,7 @@ export function NewSessionForm({ ledger, controller, close }: FormProps) {
     <Field id="new-session-name" label="酒局名称"><Input id="new-session-name" maxLength={30} required value={name} onChange={event => setName(event.target.value)} /></Field>
     <Field id="new-session-cup" label="一杯算几个（全员统一）"><Input id="new-session-cup" type="number" min={1} max={99} step={1} required value={cup} onChange={event => setCup(event.target.value)} /></Field>
     <div className="flex items-center gap-3"><Checkbox id="keep-members" checked={keep} onCheckedChange={value => setKeep(value === true)} /><Label htmlFor="keep-members">保留本局成员</Label></div>
-    <p className="text-xs text-muted-foreground">新局重新计数。</p>
+    <p className="text-xs leading-6 text-muted-foreground">新局重新计数，上一局的成员计数和操作记录会保存到历史。体验酒局和没有成员、记录的空局不归档。</p>
     <FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="confirm-new-session" type="submit" disabled={controller.saving}>确认开启</Button></div>
   </form>;
 }
@@ -114,10 +117,18 @@ export function EndSessionForm({ ledger, controller, close, summary }: FormProps
   });
   return <form id="end-session-form" onSubmit={submit} className="grid gap-5"><p className="text-sm leading-7">确认结束「{ledger.session.title}」？本局共 {ledger.session.members.length} 位酒友，剩余待喝 {ledger.session.members.reduce((sum, member) => sum + member.pending, 0)} 个。</p><p className="text-xs leading-6 text-muted-foreground">最终计数和结束时间将保存到历史酒局。结束后不能继续记账，剩余待喝原样保留，不计入已喝。</p><FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="confirm-end-session" type="submit" disabled={controller.saving}>确认结束</Button></div></form>;
 }
-export function RemoveMemberForm({ ledger, controller, close, member }: FormProps & { member: Member }) {
+export function RemoveMemberForm({ ledger, controller, close, member, session }: FormProps & { member: Member; session: Session }) {
   const { error, submit } = useFormSubmit(async () => {
-    await controller.saveMember(withLedgerSession(ledger, { ...ledger.session, members: ledger.session.members.filter(item => item.id !== member.id) }, {}), `已移除${member.name}`);
+    await controller.saveMember(removeMember(ledger, session, member), `已从本局删除${member.name}`);
     close();
   });
-  return <form id="remove-form" onSubmit={submit} className="grid gap-5"><p className="text-sm leading-7">确认移除「{member.name}」？这位成员将从本局排行榜移除，操作记录仍然保留。</p><FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="confirm-remove-member" type="submit" variant="destructive" disabled={controller.saving}>确认移除</Button></div></form>;
+  return <form id="remove-form" onSubmit={submit} className="grid gap-5"><p className="text-sm leading-7">确认从本局删除「{member.name}」？已喝 {member.consumed} 个（{member.cups} 杯），待喝 {member.pending} 个。</p><p className="text-xs leading-6 text-muted-foreground">删除后不再计入本局排行和汇总，已有操作记录、历史酒局和已保存酒友不受影响。刷新前可通过「撤销上一步」恢复。</p><FormError message={error} /><div className="flex flex-wrap justify-end gap-2"><CloseButton close={close} /><Button id="confirm-remove-member" type="submit" variant="destructive" disabled={controller.saving}>确认删除</Button></div></form>;
+}
+
+export function DeleteHistoryForm({ controller, close, archive, cancel }: FormProps & { archive: Archive; cancel: () => void }) {
+  const { error, submit } = useFormSubmit(async () => {
+    await controller.deleteHistory(archive.id);
+    close();
+  });
+  return <form id="delete-history-form" onSubmit={submit} className="grid gap-5"><div className="grid gap-2"><p className="break-words text-sm leading-7">确认删除「{archive.session.title}」？</p><p className="text-xs leading-6 text-muted-foreground">{dateTime(archive.session.startedAt)} 至 {dateTime(archive.endedAt)}</p></div><p className="text-sm leading-7">删除后无法恢复。当前酒局和已保存酒友不受影响。</p><FormError message={error} /><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" data-testid="cancel-dialog" disabled={controller.saving} onClick={cancel}>取消</Button><Button id="confirm-delete-history" type="submit" variant="destructive" disabled={controller.saving}>确认删除</Button></div></form>;
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createDeviceClient, SYNC_KEY } from '@/client/server-storage';
 import { errorSnapshot } from '@/shared/protocol';
 import { domainError, type Problem } from '@/shared/errors';
-import { emptyLedger, restoreLedger, withLedgerSession } from '@/shared/persistence';
+import { emptyLedger, removeArchive, restoreLedger, withLedgerSession } from '@/shared/persistence';
 import { requireLedger } from '@/shared/values';
 import { failureLog } from '@/shared/logging';
 import type { DeviceClient, Ledger, Session, Snapshot } from '@/shared/types';
@@ -62,11 +62,10 @@ export function useLedger(dialogOpen: boolean) {
   const initialized = useRef(false);
   useEffect(() => { if (!initialized.current) { initialized.current = true; void initialize(); } }, [initialize]);
 
-  const saveLedger = useCallback(async (ledger: Ledger, message: string): Promise<LoadedLedger> => {
+  const persistLedger = useCallback(async (ledger: Ledger, message: string): Promise<LoadedLedger> => {
     const previous = connection.current.current;
     if (!previous) throw domainError('记录尚未加载，请重新加载', 'save ledger');
     if (connection.current.busy) throw domainError('正在保存，请稍等', 'save ledger');
-    if (previous.ledger.session.endedAt !== undefined && ledger.session.startedAt === previous.ledger.session.startedAt && ledger.session.round === previous.ledger.session.round) throw domainError('本局已结束，请新开一局', 'save ledger');
     connection.current.busy = true;
     setSaving(true);
     setError(null);
@@ -86,6 +85,18 @@ export function useLedger(dialogOpen: boolean) {
       throw cause;
     } finally { connection.current.busy = false; setSaving(false); }
   }, [apply, client]);
+  const saveLedger = useCallback(async (ledger: Ledger, message: string) => {
+    const previous = connection.current.current;
+    if (!previous) throw domainError('记录尚未加载，请重新加载', 'save ledger');
+    if (previous.ledger.session.endedAt !== undefined && ledger.session.startedAt === previous.ledger.session.startedAt && ledger.session.round === previous.ledger.session.round) throw domainError('本局已结束，请新开一局', 'save ledger');
+    return persistLedger(ledger, message);
+  }, [persistLedger]);
+  // 删除只从最新账本移除指定归档，不放宽已结束本局的编辑限制。 Delete only the selected archive from the latest ledger without unlocking finished-session edits.
+  const deleteHistory = useCallback(async (archiveId: string) => {
+    const previous = connection.current.current;
+    if (!previous) throw domainError('记录尚未加载，请重新加载', 'remove archive');
+    return persistLedger(removeArchive(previous.ledger, archiveId), '已删除历史酒局');
+  }, [persistLedger]);
   const saveMember = useCallback(async (ledger: Ledger, message: string) => {
     const previous = connection.current.current?.ledger.session;
     if (!previous) throw domainError('记录尚未加载', 'save member');
@@ -152,6 +163,6 @@ export function useLedger(dialogOpen: boolean) {
     window.addEventListener('unhandledrejection', onRejection);
     return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onRejection); };
   }, []);
-  return { current, saving, loading, error, localError, notice, canUndo: snapshots.length > 0, initialize, saveLedger, saveMember, undo, repair, renameUndo: (title: string) => setSnapshots(items => items.map(item => ({ ...item, title }))), clearUndo: () => setSnapshots([]) };
+  return { current, saving, loading, error, localError, notice, canUndo: snapshots.length > 0, initialize, saveLedger, saveMember, deleteHistory, undo, repair, renameUndo: (title: string) => setSnapshots(items => items.map(item => ({ ...item, title }))), clearUndo: () => setSnapshots([]) };
 }
 export type LedgerController = ReturnType<typeof useLedger>;
