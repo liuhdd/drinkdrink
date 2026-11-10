@@ -66,13 +66,19 @@ export function finishSession(ledger: Ledger, endedAt: number | string, archiveI
   };
 }
 
-export function startNextSession(ledger: Ledger, { title, cupSize, members }: NextOptions, endedAt: number, archiveId: string): Ledger {
-  const session = createSession({ title, cupSize, members, round: ledger.session.demo ? 1 : ledger.session.round + 1 }, endedAt);
+// 新开局与手动结束共用完整归档，只跳过体验局、空局和已结束局。 Share complete archival with explicit finish, skipping demo, empty and already-finished sessions.
+export function startNextSession(ledger: Ledger, { title, cupSize, members }: NextOptions, startedAt: number, archiveId: string): Ledger {
+  const shouldArchive = !ledger.session.demo && ledger.session.endedAt === undefined && (ledger.session.members.length > 0 || ledger.session.events.length > 0);
+  const completed = shouldArchive ? finishSession(ledger, Math.max(startedAt, ledger.session.startedAt), archiveId) : ledger;
+  const session = createSession({ title, cupSize, members, round: ledger.session.demo ? 1 : ledger.session.round + 1 }, startedAt);
   return {
-    ...ledger, session,
+    ...completed, session,
     knownMembers: ledger.session.demo ? ledger.knownMembers : rememberMembers(ledger.knownMembers, ledger.session.members),
-    history: ledger.session.demo || ledger.session.endedAt !== undefined ? ledger.history : [{ id: archiveId, endedAt: Math.max(endedAt, ledger.session.startedAt), session: structuredClone(ledger.session) }, ...ledger.history],
   };
+}
+export function removeArchive(ledger: Ledger, archiveId: string): Ledger {
+  if (!ledger.history.some(archive => archive.id === archiveId)) throw domainError('这条历史酒局已删除或过期，请关闭后重新查看历史', 'remove archive');
+  return { ...ledger, history: ledger.history.filter(archive => archive.id !== archiveId) };
 }
 export function withLedgerSession(ledger: Ledger, session: import('./types.ts').Session, changes: Partial<Ledger>): Ledger {
   return { ...ledger, ...changes, session, knownMembers: rememberMembers(changes.knownMembers ?? ledger.knownMembers, session.demo ? [] : session.members) };

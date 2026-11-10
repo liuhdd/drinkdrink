@@ -5,7 +5,7 @@ import { at, field } from '../src/shared/values.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSession, addMembers, demoSession } from '../src/shared/domain.ts';
-import { restoreLedger, startNextSession, finishSession, rememberMembers, availableMembers } from '../src/shared/persistence.ts';
+import { restoreLedger, startNextSession, finishSession, removeArchive, rememberMembers, availableMembers } from '../src/shared/persistence.ts';
 
 test('旧版本记录迁移后，新开酒局归档全部计数与记录，刷新仍可读取', () => {
   let session = addMembers(createSession({ title: '周五小聚', cupSize: 2, members: [], round: 1 }, Date.now()), [{ name: '阿杰', pending: 6 }], [], draftIdentity([{ name: '阿杰', pending: 6 }].length));
@@ -14,7 +14,7 @@ test('旧版本记录迁移后，新开酒局归档全部计数与记录，刷�
   const migrated = migrateLegacyLedger(old);
   assert.equal(at(migrated.knownMembers, 0).name, '阿杰');
   const next = startNextSession(migrated, { title: '周六小聚', cupSize: 4, members: migrated.session.members }, session.startedAt + 1000, crypto.randomUUID());
-  assert.deepEqual(at(next.history, 0).session, session);
+  assert.deepEqual(at(next.history, 0).session, { ...session, endedAt: session.startedAt + 1000 });
   assert.equal(at(next.history, 0).endedAt, session.startedAt + 1000);
   assert.equal(next.session.round, 2);
   assert.equal(at(next.session.members, 0).pending, 0);
@@ -103,4 +103,36 @@ test('已添加成员离局后可快捷重选，重选保留身份与颜色、�
   const renamed = rememberMembers(profiles, [{ ...at(profiles, 0), name: '林哥' }]);
   assert.deepEqual(renamed.map(member => member.name), ['林哥', '阿杰']);
   assert.equal(availableMembers(renamed, added).length, 1);
+});
+
+test('新开局跳过空局，零计数成员或仅剩操作记录仍完整归档', () => {
+  const startedAt = Date.now();
+  const empty = migrateLegacyLedger({ session: createSession({ title: '空局', cupSize: 2, members: [], round: 1 }, startedAt), step: 1 });
+  const options = { title: '下一局', cupSize: 3, members: [] };
+  assert.equal(startNextSession(empty, options, startedAt + 1, 'empty').history.length, 0);
+  const populated = { ...empty, session: addMembers(empty.session, [{ name: '未记账酒友' }], [], { memberIds: ['friend'], eventIds: [], at: startedAt }) };
+  assert.equal(startNextSession(populated, options, startedAt + 1, 'member').history.length, 1);
+  const recorded = memberAction(populated.session, 'friend', 'add', 1, { id: 'event', at: startedAt });
+  const removed = { ...populated, session: { ...recorded, members: [] } };
+  const archived = startNextSession(removed, options, startedAt + 1, 'events');
+  assert.deepEqual(at(archived.history, 0).session.events, recorded.events);
+  assert.equal(at(archived.history, 0).session.endedAt, startedAt + 1);
+  assert.equal(removed.session.endedAt, undefined);
+});
+
+test('删除历史只移除指定归档，保留其余顺序且拒绝过期目标，不修改输入', () => {
+  const now = Date.now();
+  const initial = migrateLegacyLedger({ session: createSession({ title: '第一局', cupSize: 2, members: [], round: 1 }, now - 3), step: 2 });
+  const first = finishSession(initial, now - 2, 'first');
+  const next = startNextSession(first, { title: '第二局', cupSize: 2, members: [] }, now - 1, 'unused');
+  const finished = finishSession(next, now, 'second');
+  Object.freeze(finished.history); Object.freeze(finished);
+  const deleted = removeArchive(finished, 'first');
+  assert.deepEqual(deleted.history.map(archive => archive.id), ['second']);
+  assert.deepEqual(finished.history.map(archive => archive.id), ['second', 'first']);
+  assert.equal(deleted.session, finished.session);
+  assert.equal(deleted.knownMembers, finished.knownMembers);
+  assert.equal(deleted.step, finished.step);
+  assert.throws(() => removeArchive(deleted, 'first'), /已删除或过期/);
+  assert.throws(() => removeArchive(deleted, 'missing'), /已删除或过期/);
 });
