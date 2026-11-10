@@ -28,3 +28,10 @@ export const deviceCharades = sqliteTable('device_charades', {
   lastRequestId: text('last_request_id'),
   lastRequestHash: text('last_request_hash'),
 });
+
+export const guandanRooms = sqliteTable('guandan_rooms', {
+  roomId: text('room_id').primaryKey(),
+  data: text('data').notNull(),
+  version: integer('version').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+}, table => [index('guandan_rooms_expires_at_idx').on(table.expiresAt)]);

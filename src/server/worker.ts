@@ -8,6 +8,7 @@ import type { ExternalValue, WorkerEnv, LedgerDatabase, DatabaseRow, Snapshot, L
 import { field } from '../shared/values.ts';
 import { restoreLedger } from '../shared/persistence.ts';
 import { RETENTION_MS, retainLedger, prepareLedger } from './retention.ts';
+import { guandanRoomsApi, cleanupGuandanRooms } from './guandan-rooms.ts';
 import { charadesApi } from './charades.ts';
 
 const json = (value: object, status: number): Response => Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', 'Vary': 'X-Device-ID' } });
@@ -51,6 +52,7 @@ function decodeStored(row: DatabaseRow) {
 const responseData = (row: DatabaseRow | null): Snapshot => row ? { ledger: restoreLedger(decodeStored(row).ledger), revision: row.revision, generation: row.generation } : empty();
 
 export async function cleanupExpired(rawDatabase: LedgerDatabase, now: number): Promise<void> {
+  await cleanupGuandanRooms(rawDatabase, now);
   const db = diagnosticDatabase(rawDatabase);
   await db.prepare('DELETE FROM device_ledgers WHERE updated_at < ?').bind(now - RETENTION_MS).run();
   // 使用索引和有界批次，使定时任务符合 Worker 限制。 Indexed, bounded batches keep scheduled work within Worker limits.
@@ -67,6 +69,7 @@ export default {
   async fetch(request: Request, env: WorkerEnv) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (url.pathname.startsWith('/api/guandan/rooms')) return guandanRoomsApi(request, env.DB);
     if (url.pathname === '/api/charades' || url.pathname === '/api/charades/next') return charadesApi(request, env.DB);
     if (url.pathname !== '/api/ledger') return rejected(request, 'HTTP', `接口不存在：${url.pathname}`, 404);
     if (!['GET', 'PUT'].includes(request.method)) return rejected(request, 'HTTP', `不支持请求方法 ${request.method}，请使用 GET 或 PUT`, 405);

@@ -5,15 +5,18 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DiceTool } from './dice-tool';
 import { CharadesTool } from './charades-tool';
+import { GuandanTool } from './guandan-tool';
 
 const tools = [
   { id: 'dice', name: '摇骰子', image: '/design/tools/dice.png', component: DiceTool },
+  { id: 'guandan', name: '掼蛋', image: '/design/tools/guandan.svg', component: GuandanTool },
   { id: 'charades', name: '你比划我猜', image: '/design/tools/charades.png', component: CharadesTool },
 ] as const;
 type Tool = typeof tools[number];
 
 export function DrinkingTools() {
   const [selected, setSelected] = useState<Tool | null>(null);
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('tool') === 'guandan-room' || new URLSearchParams(window.location.hash.slice(1)).has('guandan-room')) setSelected(tools[1]); }, []);
   const [previous, setPrevious] = useState<Tool['id'] | null>(null);
   useEffect(() => {
     if (selected) document.getElementById(`${selected.id}-title`)?.focus();

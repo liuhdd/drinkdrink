@@ -35,6 +35,13 @@ export async function startLocalServer(port: number, assets: AssetHandler, dispo
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       outgoing.end(Buffer.from(await response.arrayBuffer()));
     } catch (caught) {
+      // 联网牌局错误不输出请求、凭证或存储上下文。 Room failures never expose request, credentials or stored game context.
+      if (incoming.url?.startsWith('/api/guandan/rooms')) {
+        console.error({ operation: 'local guandan HTTP', code: 'INTERNAL' });
+        outgoing.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' });
+        outgoing.end(JSON.stringify({ error: { code: 'INTERNAL', message: '房间请求失败，请稍后重试' } }));
+        return;
+      }
       const cause = caught instanceof Error ? caught : new Error(String(caught), { cause: caught });
       const failure = isProblem(cause) ? cause : problem('INTERNAL', `本地 HTTP 请求失败：${cause.message}`, { ...context('local HTTP request', null), request: { method: incoming.method ?? 'GET', url: incoming.url ?? '/', body: null, deviceId: incoming.headers['x-device-id']?.toString() ?? null, requestId: incoming.headers['x-request-id']?.toString() ?? null }, status: 500 }, cause);
       console.error(failureLog('local HTTP', failure));
