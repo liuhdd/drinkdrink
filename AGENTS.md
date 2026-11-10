@@ -8,10 +8,13 @@
 - 产品行为、运行要求及数据保留规则以 [README.md](README.md) 为准，不在本文件重复产品文档。
 - `src/app/`：Next.js 页面入口、元数据和 Tailwind v4 主题；`src/components/`：React 页面与表单，`ui/` 为 shadcn/ui 组件源码。
 - UI 统一使用 shadcn/ui 组件和 Lucide SVG 图标；颜色、圆角通过 `globals.css` 的语义主题统一管理，装饰性图标使用 `aria-hidden`，保留操作入口的稳定 ID 与无障碍名称。
-- 当前界面采用奶油橙设计：暖白底、克制的白色圆角面板、橙色操作与选中状态；成员和排行采用连续分隔行，避免逐行浮动卡片；成员插画位于 `public/design/avatars/`，按既有头像颜色索引显示并保留昵称首字。工具入口在手机端也固定为两列紧凑卡片，使用 `public/design/tools/` 本地插画，整张卡片为原有操作入口；手机游戏详情只显示自身返回标题栏，为手势区与底部操作保留空间。总结分享图沿用同一配色。
+- 当前界面采用奶油橙设计：暖白底、克制的白色圆角面板、橙色操作与选中状态；成员和排行采用连续分隔行，避免逐行浮动卡片；成员插画位于 `public/design/avatars/`，按既有头像颜色索引显示并保留昵称首字。工具入口在手机端也固定为两列紧凑卡片，使用 `public/design/tools/` 本地插画，整张卡片为原有操作入口；手机游戏详情只显示自身返回标题栏，为手势区与底部操作保留空间。总结分享图沿用同一配色，预览图片使用直角。
 - 界面不常驻保存/同步成功说明、酒局序号、重复的杯量换算或功能介绍；保留必要的输入标签、状态标识、操作反馈与错误恢复入口。
 - 酒局名称位于顶部导航栏，不另设摘要卡片；“结束本局”仅在右上角省略号打开的酒局设置中提供，并保留结束确认。体验局与已结束酒局不显示结束入口。
-- 喝酒工具列表入口位于 `src/components/drinking-tools.tsx`；新增工具在此登记图标、名称与界面，界面接收 `back` 导航节点并放入卡片标题栏。骰盅与骰子使用原生 CSS 3D，界面在 `src/components/dice-tool.tsx`，手势与摇骰生命周期在 `src/hooks/use-dice.ts`，本地音效在 `src/client/dice-audio.ts`，与账本 API 独立。
+- 顶部省略号与底部设置均打开设置入口，分别进入对局设置和外观设置；账本未加载时仍可使用外观设置。外观配置独立存于当前浏览器 `cheers-appearance-v1`，不写账本 API；浏览器顶栏同步全站底色。模型、严格解析与区域清单在 `src/shared/appearance.ts`，存储和 React 连接器在 `src/client/appearance-storage.ts`、`src/hooks/use-appearance.ts`。
+- `src/components/appearance-settings.tsx` 提供全站及区域独立的字体、圆角、底色透明度、毛玻璃、按钮大小和配色调整，立即生效并保存，支持区域跟随全站与恢复全部默认。`data-appearance-region` 声明独立作用域，`data-appearance-surface` 仅调整背景表面；变量生成在 `src/client/appearance-css.ts`，不降低文字透明度或扁平化骰子三维空间。新局弹窗使用 `new-session` 区域，默认跟随全站；成员与结束弹窗使用 `member-dialog`。游戏卡片的模糊绘制在独立伪元素层，避免为固定操作条建立定位容器。外观编辑器及其导航保持默认可读样式，预览应用所选配置。新区域需同时登记模型和实际 DOM 绑定。
+- 记账页点击酒友行，在列表下方操作区展开加减酒、喝完一杯与编辑入口；同一时间只选中一位酒友，再次点击取消选择，新开酒局清空选择。结束后酒友行只读显示已喝个数、杯数与剩余待喝，不再展开操作。
+- 喝酒工具列表入口位于 `src/components/drinking-tools.tsx`；新增工具在此登记图标、名称与界面，界面接收 `back` 导航节点并放入卡片标题栏。骰盅与骰子使用原生 CSS 3D，界面在 `src/components/dice-tool.tsx`，数量设置使用独立模态弹窗，不挤占场景；场景按可用屏幕空间放大，并为完整揭盅和底部摇骰按钮留出空间。手势与摇骰生命周期在 `src/hooks/use-dice.ts`，本地音效在 `src/client/dice-audio.ts`，与账本 API 独立。
 - 你比划我猜界面、React 连接器和 HTTP 连接器分别在 `src/components/charades-tool.tsx`、`src/hooks/use-charades.ts`、`src/client/charades.ts`；共享协议在 `src/shared/charades.ts`。题库与来源仅放在 `src/server/charades-questions.ts`，不导入浏览器模块。`src/server/charades.ts` 提供 `/api/charades` 与 `/api/charades/next`，独立 `device_charades` 表持久化设备出题进度，不随账本保留期或新酒局重置。下一题沿用设备标识、请求标识与原子版本检查；读取恢复当前题，不推进题目。
 - `src/hooks/`：React 浏览器连接器、同步与 WebMCP 生命周期；`src/client/`：存储连接器、客户端操作和总结图片。
 - `src/shared/`：账本类型、成员计数、酒局转换、排行榜和外部数据解析。
