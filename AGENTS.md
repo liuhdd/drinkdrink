@@ -17,6 +17,8 @@
 - 记账页点击酒友行，在列表下方操作区展开加减酒、喝完一杯与编辑入口；同一时间只选中一位酒友，再次点击取消选择，新开酒局清空选择。结束后酒友行只读显示已喝个数、杯数与剩余待喝，不再展开操作。编辑窗昵称旁提供「删除酒友」并二次确认，保持 `delete-member` 与 `confirm-remove-member` ID；编辑和删除共用 `src/client/member-source.ts` 校验，只作用于打开表单时的当前局及未变更的成员，保留操作记录、历史与已保存酒友，并沿用成员操作撤销。
 - 喝酒工具列表入口位于 `src/components/drinking-tools.tsx`；新增工具在此登记图标、名称与界面，界面接收 `back` 导航节点并放入卡片标题栏。骰盅与骰子使用原生 CSS 3D，界面在 `src/components/dice-tool.tsx`，数量设置使用独立模态弹窗，不挤占场景；场景按可用屏幕空间放大，并为完整揭盅和底部摇骰按钮留出空间。手势与摇骰生命周期在 `src/hooks/use-dice.ts`，本地音效在 `src/client/dice-audio.ts`，与账本 API 独立。
 - 你比划我猜界面、React 连接器和 HTTP 连接器分别在 `src/components/charades-tool.tsx`、`src/hooks/use-charades.ts`、`src/client/charades.ts`；共享协议在 `src/shared/charades.ts`。题库与来源仅放在 `src/server/charades-questions.ts`，不导入浏览器模块。`src/server/charades.ts` 提供 `/api/charades` 与 `/api/charades/next`，独立 `device_charades` 表持久化设备出题进度，不随账本保留期或新酒局重置。下一题沿用设备标识、请求标识与原子版本检查；读取恢复当前题，不推进题目。
+- 掼蛋入口在 `src/components/guandan-tool.tsx`，本机练习界面在 `src/components/guandan-practice.tsx`，浏览器生命周期在 `src/hooks/use-guandan.ts`；规则、牌型与严格记录解析在 `src/shared/guandan*.ts`。`src/client/guandan-storage.ts` 使用独立本地键保存当前牌局，通过 Web Locks 串行写入并在保存前检查其他页面更新；不写账本 API，与联网组局状态隔离。洗牌随机源显式传入，规则转换为纯函数；离开工具或隐藏页面时停止电脑定时器，读取失败不得自动覆盖记录。
+- 掼蛋扫码组局界面在 `src/components/guandan-room-*.tsx`，连接器在 `src/hooks/use-guandan-room.ts` 与 `src/client/guandan-room*.ts`；协议在 `src/shared/guandan-room.ts`，权威牌局接口在 `src/server/guandan-rooms.ts`。独立 `guandan_rooms` 表固定 24 小时到期，之后一天清理；GET 只读，电脑随写操作推进。邀请凭证与座位凭证分离，二维码本地生成、邀请使用 fragment；只返回本人手牌。房间错误与数据库重试须脱敏，禁止套用会暴露 SQL 参数/完整牌局的账本错误响应。扫码功能须联网同站，不能声称支持离线局域网直连。
 - `src/hooks/`：React 浏览器连接器、同步与 WebMCP 生命周期；`src/client/`：存储连接器、客户端操作和总结图片。
 - `src/shared/`：账本类型、成员计数、酒局转换、排行榜和外部数据解析。
 - `src/server/`：Worker API 和数据保留规则。

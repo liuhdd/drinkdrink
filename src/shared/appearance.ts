@@ -31,6 +31,7 @@ export const APPEARANCE_REGIONS = [
   { id: 'tools', label: '工具入口', page: 'tools' },
   { id: 'dice', label: '摇骰子', page: 'tools' },
   { id: 'dice-settings', label: '骰子数量弹窗', page: 'tools' },
+  { id: 'guandan', label: '掼蛋', page: 'tools' },
   { id: 'charades', label: '你比划我猜', page: 'tools' },
   { id: 'session-settings', label: '对局设置', page: 'settings' },
   { id: 'new-session', label: '开启新一局', page: 'settings' },

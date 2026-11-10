@@ -24,6 +24,7 @@ export function LedgerApp() {
   const focusDestination = useRef<string | null>(null);
   const [dialog, setDialog] = useState<LedgerDialogState | null>(null);
   const [view, setView] = useState('ledger');
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('tool') === 'guandan-room' || new URLSearchParams(window.location.hash.slice(1)).has('guandan-room')) setView('tools'); }, []);
   const [appearanceBackView, setAppearanceBackView] = useState('ledger');
   const [selection, setSelection] = useState<{ memberId: string; startedAt: number } | null>(null);
   const [actionError, setActionError] = useState('');
