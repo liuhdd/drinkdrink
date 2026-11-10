@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createDeviceClient, SYNC_KEY } from '@/client/server-storage';
+import { restoreMemberSnapshot } from '@/client/undo-member';
 import { errorSnapshot } from '@/shared/protocol';
 import { domainError, type Problem } from '@/shared/errors';
-import { emptyLedger, removeArchive, restoreLedger, withLedgerSession } from '@/shared/persistence';
+import { emptyLedger, removeArchive, restoreLedger } from '@/shared/persistence';
 import { requireLedger } from '@/shared/values';
 import { failureLog } from '@/shared/logging';
 import type { DeviceClient, Ledger, Session, Snapshot } from '@/shared/types';
@@ -108,7 +109,7 @@ export function useLedger(dialogOpen: boolean) {
     const previous = snapshots.at(-1);
     const value = connection.current.current;
     if (!previous || !value) throw domainError('没有可以撤销的操作', 'undo');
-    await saveLedger(withLedgerSession(value.ledger, previous, {}), '已撤销上一步');
+    await saveLedger(restoreMemberSnapshot(value.ledger, previous), '已撤销上一步');
     setSnapshots(items => items.slice(0, -1));
   }, [saveLedger, snapshots]);
   const repair = useCallback(async () => {
