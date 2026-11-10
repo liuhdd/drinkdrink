@@ -52,12 +52,12 @@ export function AddMembersForm({ ledger, controller, close }: FormProps) {
     <FormError message={error} /><div className="flex justify-end gap-2"><CloseButton close={close} /><Button id="add-members-submit" type="submit" disabled={controller.saving}>添加 {drafts.length} 位</Button></div>
   </form>;
 }
-export function EditMemberForm({ ledger, controller, close, member, remove }: FormProps & { member: Member; remove: () => void }) {
+export function EditMemberForm({ ledger, controller, close, member, session, remove }: FormProps & { member: Member; session: Session; remove: () => void }) {
   const [name, setName] = useState(member.name);
   const [color, setColor] = useState(member.color);
   const [pending, setPending] = useState(String(member.pending));
   const { error, submit } = useFormSubmit(async () => {
-    await controller.saveMember(editMember(ledger, member.id, name, color, pending, { id: crypto.randomUUID(), at: Date.now() }), `已更新${name}`);
+    await controller.saveMember(editMember(ledger, { session, member }, name, color, pending, { id: crypto.randomUUID(), at: Date.now() }), `已更新${name}`);
     close();
   });
   return <form id="member-form" onSubmit={submit} className="grid gap-5">
