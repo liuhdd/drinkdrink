@@ -38,7 +38,7 @@ export function Members({ session, selectedId, select }: { session: Session; sel
 export function Ranking({ session }: { session: Session }) {
   const ranked = leaderboard(session);
   const max = ranked[0]?.consumed || 1;
-  return <div id="leaderboard" className="ranking-list">
+  return <div id="leaderboard" data-appearance-surface="card" className="ranking-list overflow-hidden rounded-lg">
     {ranked.length ? ranked.map(member => <div key={member.id} data-testid={`rank-${member.id}`} className={cn('ranking-row flex items-center gap-2.5 px-3 py-4 sm:gap-3 sm:px-4', member.consumed > 0 && member.rank === 1 && 'is-leading')}>
       <span aria-label={`第 ${member.rank} 名`} className={cn('flex w-5 shrink-0 flex-col items-center gap-0.5 text-xs font-semibold tabular-nums text-muted-foreground', member.consumed > 0 && member.rank === 1 && 'text-primary')}>{member.rank === 1 && member.consumed > 0 && <Trophy aria-hidden="true" className="size-4" />}{member.rank}</span>
       <Avatar profile={member} /><div className="min-w-0 flex-1"><p className="truncate text-base font-semibold">{member.name}</p><p className="mt-1 text-xs tabular-nums text-muted-foreground"><span>{member.cups} 杯</span><span className="ml-3">待喝 {member.pending} 个</span></p><div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-border/70"><div className="h-full rounded-full bg-signal" style={{ width: `${member.consumed / max * 100}%` }} /></div></div>
@@ -47,7 +47,7 @@ export function Ranking({ session }: { session: Session }) {
   </div>;
 }
 export function Activities({ events }: { events: readonly LedgerEvent[] }) {
-  return <div id="activity-list" className="divide-y divide-border border-y border-border px-1">
+  return <div id="activity-list" data-appearance-surface="card" className="divide-y divide-border overflow-hidden rounded-lg border-y border-border px-1">
     {events.length ? events.map(event => <div key={event.id} className="flex items-center gap-2.5 py-3 text-sm [&_[data-avatar]]:size-8 [&_[data-avatar]>span]:hidden">
       <Avatar profile={event} /><div className="min-w-0 flex-1 text-muted-foreground"><strong className="mr-2 break-all font-medium text-foreground">{event.name}</strong>{{ add: '加酒', subtract: '减酒', drink: '喝完一杯，扣减', set: '待喝调整为' }[event.action]} <span className="tabular-nums text-primary">{event.amount} 个</span></div>
       <time className="shrink-0 text-[calc(11px*var(--appearance-text-scale))] tabular-nums text-muted-foreground" dateTime={new Date(event.at).toISOString()}>{new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(event.at)}</time>
@@ -58,7 +58,7 @@ export function RankingPanel({ session }: { session: Session }) {
   return <section data-appearance-region="ranking" role="complementary" aria-label="单局排行榜">
     <h2 className="mb-4 text-xl font-bold">单局排行榜</h2>
     <Ranking session={session} />
-    <div data-appearance-region="ranking-totals" className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm"><span className="flex items-center gap-2 font-semibold"><Users aria-hidden="true" className="size-4 text-primary" />{session.members.length} 位酒友</span><span className="text-muted-foreground">合计已喝 <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.consumed, 0)}</strong> 个，<strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.cups, 0)}</strong> 杯</span></div>
+    <div id="ranking-totals" data-appearance-region="ranking-totals" data-appearance-surface="card" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg p-4 text-sm"><span className="flex items-center gap-2 font-semibold"><Users aria-hidden="true" className="size-4 text-primary" />{session.members.length} 位酒友</span><span className="text-muted-foreground">合计已喝 <strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.consumed, 0)}</strong> 个，<strong className="text-lg font-semibold tabular-nums text-primary">{session.members.reduce((sum, item) => sum + item.cups, 0)}</strong> 杯</span></div>
   </section>;
 }
 export function CloseButton({ close }: { close: () => void }) { return <Button type="button" variant="outline" onClick={close} data-testid="cancel-dialog">取消</Button>; }

@@ -147,6 +147,18 @@ test('外观设置在真实浏览器立即应用、分区覆盖并持久保存�
   await member.click();
   await expect(page.locator('#drink-button')).toHaveCSS('background-color', 'rgb(106, 61, 194)');
   await expect.poll(() => page.locator('#drink-button').evaluate(button => Number.parseFloat(getComputedStyle(button).height))).toBeCloseTo(57.6, 1);
+  // 全站透明度与模糊必须落到实际表面，而不只是区域变量。 Global opacity and blur must reach the rendered surfaces, not only region variables.
+  await expect(page.locator('#activity-list')).toHaveCSS('background-color', /\/ 0\.7\)$/);
+  await expect(page.locator('#activity-list')).toHaveCSS('backdrop-filter', 'blur(12px)');
+  await page.locator('#mobile-ranking').click();
+  await expect(page.locator('#leaderboard')).toHaveCSS('background-color', /\/ 0\.7\)$/);
+  await expect(page.locator('#leaderboard')).toHaveCSS('backdrop-filter', 'blur(12px)');
+  await expect(page.locator('#ranking-totals')).toHaveCSS('background-color', /\/ 0\.7\)$/);
+  await expect(page.locator('#ranking-totals')).toHaveCSS('backdrop-filter', 'blur(12px)');
+  await page.locator('#mobile-tools').click();
+  await expect(page.locator('#tool-dice')).toHaveCSS('background-color', /\/ 0\.7\)$/);
+  await expect(page.locator('#tool-dice')).toHaveCSS('backdrop-filter', 'blur(12px)');
+  await page.locator('#mobile-ledger').click();
 
   await openAppearance(page);
   await page.locator('#appearance-page').selectOption('ledger');
@@ -200,6 +212,24 @@ test('外观设置在真实浏览器立即应用、分区覆盖并持久保存�
   await expect(page.locator('#drink-button')).toHaveCSS('background-color', 'rgb(187, 66, 0)');
   expect(ledgerWrites).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test('工具区域的独立透明度与模糊作用于工具卡片实际表面', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#workspace')).toBeVisible();
+  await openAppearance(page);
+  await page.locator('#appearance-page').selectOption('tools');
+  await page.locator('#appearance-region').selectOption('tools');
+  await page.locator('#appearance-customize-region').check();
+  await page.locator('#appearance-opacity-number').fill('40');
+  await page.locator('#appearance-blur-number').fill('16');
+  await leaveAppearance(page);
+  await page.locator('#mobile-tools').click();
+  await expect(page.locator('#tool-dice')).toHaveCSS('background-color', /\/ 0\.4\)$/);
+  await expect(page.locator('#tool-dice')).toHaveCSS('backdrop-filter', 'blur(16px)');
+  await page.locator('#mobile-ledger').click();
+  await expect(page.locator('#activity-list')).toHaveCSS('background-color', /^(rgb\(255, 255, 255\)|color\(srgb 1 1 1\))$/);
+  await expect(page.locator('#activity-list')).toHaveCSS('backdrop-filter', 'none');
 });
 
 test('新局弹窗遮罩跟随页面底色，保留半透明表面与独立强调色', async ({ page }) => {

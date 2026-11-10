@@ -95,6 +95,8 @@
   background-color: color-mix(in srgb, var(--appearance-surface-color) calc(var(--appearance-surface-opacity) * var(--appearance-surface-tint)), transparent);
   backdrop-filter: var(--appearance-backdrop-filter);
 }
+/* 表面保留交互底色，同时继续使用区域的透明度与模糊。 Keep interactive surface colors while honoring region opacity and blur. */
+[data-appearance-surface][data-appearance-hover="accent"]:hover { --appearance-surface-color: var(--accent); }
 /* 毛玻璃独立成层，避免游戏卡片成为底部固定按钮的定位容器。 Layer game blur separately so the card does not contain fixed game controls. */
 [data-appearance-surface="game"] { position: relative; isolation: isolate; backdrop-filter: none; }
 [data-appearance-surface="game"]::before {
